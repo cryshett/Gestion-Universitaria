@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniGestion | Portal del Docente Universitario</title>
+    
+    <!-- Fuentes Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Hojas de Estilos CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+    <style>
+        .teacher-profile-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .teacher-avatar {
+            width: 64px;
+            height: 64px;
+            background: var(--primary-light);
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.7rem;
+            border: 1px solid #bfdbfe;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container" style="flex-direction:column;">
+        
+        <!-- TOP BAR DOCENTE -->
+        <header class="top-bar" style="background:#1e3a8a; color:#fff;">
+            <div class="top-bar-title">
+                <h2 style="color:#fff;"><i data-lucide="graduation-cap"></i> Portal de Claustro Docente</h2>
+                <p style="color:#93c5fd;">Gestión de Clases, Calificaciones y Nómina de Alumnos</p>
+            </div>
+            <div class="top-bar-actions" style="display:flex; align-items:center; gap:1rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.1); padding:0.4rem 0.8rem; border-radius:4px;">
+                    <span class="badge badge-activo" style="background:#10b981; color:#fff;">Docente</span>
+                    <strong id="header-docente-nombre" style="font-size:0.85rem; color:#fff;">Cargando...</strong>
+                </div>
+                <a href="/logout" class="btn btn-secondary" style="text-decoration:none; background:#fff; color:#1e3a8a;" title="Cerrar Sesión">
+                    <i data-lucide="log-out"></i> Salir
+                </a>
+            </div>
+        </header>
+
+        <div class="content-wrapper" style="max-width:1200px; margin:0 auto; width:100%;">
+            
+            <!-- TARJETA PERFIL DOCENTE -->
+            <div id="teacher-profile-box" class="teacher-profile-card">
+                <div class="teacher-avatar">
+                    <i data-lucide="user-check"></i>
+                </div>
+                <div>
+                    <h3 id="docente-nombre" style="font-family:var(--font-heading); font-size:1.3rem; color:var(--text-main);">Cargando perfil de docente...</h3>
+                    <p id="docente-sub" style="font-size:0.88rem; color:var(--text-muted); margin-top:0.2rem;"></p>
+                </div>
+            </div>
+
+            <!-- SECCIÓN: ASIGNATURAS A CARGO -->
+            <div class="panel-box">
+                <div class="panel-header">
+                    <h3><i data-lucide="book-open"></i> Asignaturas a su Cargo este Semestre</h3>
+                </div>
+                <div class="panel-body">
+                    <div id="teacher-asgs-grid" class="asignaturas-grid"></div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN: MATRIZ DE HORARIO DOCENTE -->
+            <div class="panel-box">
+                <div class="panel-header">
+                    <h3><i data-lucide="calendar"></i> Matriz de Horario Semanal Impartido</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:140px; text-align:center;">Bloque Horario</th>
+                                    <th style="width:18%;">Lunes</th>
+                                    <th style="width:18%;">Martes</th>
+                                    <th style="width:18%;">Miércoles</th>
+                                    <th style="width:18%;">Jueves</th>
+                                    <th style="width:18%;">Viernes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-horario-docente"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL NÓMINA Y REGISTRO DE NOTAS DE LA MATERIA -->
+    <div id="modal-nomina-docente" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-docente-asg-titulo"><i data-lucide="users"></i> Nómina de Alumnos y Calificaciones</h3>
+                    <p id="modal-docente-asg-sub" style="font-size:0.8rem; color:var(--text-muted);">Registro oficial de notas y asistencia de la asignatura</p>
+                </div>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-container">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Avatar</th>
+                                <th>Matrícula</th>
+                                <th>Estudiante</th>
+                                <th>Carrera</th>
+                                <th>Semestre</th>
+                                <th>Nota Actual</th>
+                                <th>Actualizar Nota (0.0 - 5.0)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-docente-estudiantes"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.lucide) lucide.createIcons();
+
+            document.querySelectorAll('.btn-close-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('modal-nomina-docente').classList.remove('active');
+                });
+            });
+
+            try {
+                const me = await fetch('/api/me').then(r => r.json());
+                if (me.role !== 'teacher') {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                document.getElementById('header-docente-nombre').innerText = me.nombre;
+                document.getElementById('docente-nombre').innerText = me.nombre;
+                document.getElementById('docente-sub').innerText = `Código: ${me.id} • DNI: ${me.documento} • ${me.titulo_academico} (${me.carrera_principal})`;
+
+                const dash = await fetch(`/api/docentes/${me.id}/dashboard`).then(r => r.json());
+                renderAsignaturasDocente(dash.asignaturas, me.nombre);
+                renderHorarioDocente(dash.asignaturas);
+            } catch (err) {
+                console.error("Error al cargar portal docente:", err);
+            }
+        });
+
+        function renderAsignaturasDocente(asgs, docenteNombre) {
+            const grid = document.getElementById('teacher-asgs-grid');
+            if (asgs.length === 0) {
+                grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#64748b;">No tiene asignaturas asignadas en el período actual.</div>';
+                return;
+            }
+
+            grid.innerHTML = asgs.map(a => `
+                <div class="grupo-card-compact" style="border-left:4px solid var(--primary);">
+                    <div class="grupo-header-compact">
+                        <span class="asg-code"><code>${a.codigo}</code></span>
+                        <span class="badge badge-activo">${a.grupo} • ${a.aula}</span>
+                    </div>
+                    <h4 style="font-family:var(--font-heading); font-size:1rem; font-weight:700;">${a.nombre}</h4>
+                    <div style="font-size:0.8rem; color:var(--text-muted);">
+                        Nivel ${a.nivel} • ${a.creditos} Créditos • ${a.tipo}
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--primary); font-weight:600; margin-top:0.3rem;">
+                        <i data-lucide="clock" style="width:14px; height:14px; vertical-align:middle;"></i> ${a.horario}
+                    </div>
+                    <div style="margin-top:0.6rem; border-top:1px solid #f1f5f9; padding-top:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.8rem; font-weight:700;">Alumnos: ${a.inscritos}</span>
+                        <button class="btn btn-primary" style="padding:0.3rem 0.6rem; font-size:0.78rem;" onclick="abrirModalDocenteAsg('${a.id}', '${a.grupo}', '${a.nombre.replace(/'/g, "\\'")}')">
+                            <i data-lucide="edit-3" style="width:13px; height:13px;"></i> Gestionar Notas
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderHorarioDocente(asgs) {
+            const tbody = document.getElementById('tbody-horario-docente');
+            const bloques = [
+                { hora: "07:00-09:00", label: "07:00 AM - 09:00 AM" },
+                { hora: "09:00-11:00", label: "09:00 AM - 11:00 AM" },
+                { hora: "10:00-12:00", label: "10:00 AM - 12:00 PM" }
+            ];
+            const dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+
+            tbody.innerHTML = bloques.map(b => {
+                const celdas = dias.map(d => {
+                    const diaAbr = d.substring(0, 3);
+                    const mat = asgs.filter(a => a.horario.includes(diaAbr) && a.horario.includes(b.hora));
+                    if (mat.length === 0) {
+                        return '<td style="background:#fafafa; color:#cbd5e1; text-align:center; font-size:0.75rem;">— Libre —</td>';
+                    }
+                    return mat.map(m => `
+                        <td>
+                            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-left:3px solid #1e3a8a; padding:0.4rem; border-radius:4px; font-size:0.75rem;">
+                                <div style="font-weight:700; color:#1e3a8a;"><code>${m.codigo}</code> • ${m.nombre}</div>
+                                <div style="color:#64748b; margin-top:2px; display:inline-flex; align-items:center; gap:3px;">
+                                    <i data-lucide="map-pin" style="width:12px; height:12px;"></i> <span>${m.grupo} • ${m.aula} (${m.inscritos} inscritos)</span>
+                                </div>
+                            </div>
+                        </td>
+                    `).join('');
+                }).join('');
+
+                return `
+                    <tr>
+                        <td style="text-align:center; font-weight:700; background:#f8fafc; font-size:0.8rem;">${b.label}</td>
+                        ${celdas}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function abrirModalDocenteAsg(asgId, grupo, asgNombre) {
+            try {
+                const res = await fetch(`/api/grupos/${asgId}/estudiantes?grupo=${grupo}`).then(r => r.json());
+                document.getElementById('modal-docente-asg-titulo').innerText = `Nómina y Calificaciones: ${asgNombre} (${grupo})`;
+                document.getElementById('modal-docente-asg-sub').innerText = `Inscritos: ${res.total_inscritos} estudiantes matriculados`;
+
+                const tbody = document.getElementById('tbody-docente-estudiantes');
+                if (res.estudiantes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:#64748b;">No hay alumnos inscritos.</td></tr>';
+                } else {
+                    tbody.innerHTML = res.estudiantes.map(e => `
+                        <tr>
+                            <td><img src="${e.foto_avatar}" width="32" height="32" style="border-radius:50%;"></td>
+                            <td><code>${e.matricula}</code></td>
+                            <td><strong>${e.nombre}</strong></td>
+                            <td>${e.carrera_nombre}</td>
+                            <td>${e.semestre}º Semestre</td>
+                            <td><strong style="font-size:1rem; color:${e.nota < 3.5 ? '#b91c1c' : '#047857'};">${e.nota.toFixed(1)}</strong></td>
+                            <td>
+                                <div style="display:flex; gap:0.4rem;">
+                                    <input type="number" id="inp-nota-${e.id}" min="0.0" max="5.0" step="0.1" value="${e.nota}" style="width:70px; padding:0.25rem; font-size:0.85rem; border:1px solid #cbd5e1; border-radius:4px;">
+                                    <button class="btn btn-success" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="guardarNotaDocente('${e.id}', '${asgId}', '${asgId}', '${grupo}', '${asgNombre.replace(/'/g, "\\'")}')">
+                                        <i data-lucide="check" style="width:12px; height:12px;"></i> Guardar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+                document.getElementById('modal-nomina-docente').classList.add('active');
+                if (window.lucide) lucide.createIcons();
+            } catch (err) {
+                console.error("Error al cargar alumnos del docente:", err);
+            }
+        }
+
+        async function guardarNotaDocente(estId, asgId, refreshAsgId, grupo, asgNombre) {
+            const val = document.getElementById(`inp-nota-${estId}`).value;
+            try {
+                const res = await fetch(`/api/estudiantes/${estId}/notas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ asignatura_id: asgId, nota: val })
+                }).then(r => r.json());
+
+                if (res.error) {
+                    const msg = res.mensaje || (typeof res.error === 'string' ? res.error : 'No fue posible guardar la calificación.');
+                    alert("Error: " + msg);
+                } else {
+                    alert("¡Nota guardada correctamente!");
+                    abrirModalDocenteAsg(refreshAsgId, grupo, asgNombre);
+                }
+            } catch (err) {
+                alert("Error de servidor al guardar calificación.");
+            }
+        }
+    </script>
+</body>
+</html>

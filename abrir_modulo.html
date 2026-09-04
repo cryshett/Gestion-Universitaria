@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniGestion PRO | Plataforma Multirrol de Gestión Universitaria</title>
+    
+    <!-- Fuentes Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root {
+            --primary: #1e3a8a; --primary-hover: #1e40af; --primary-light: #eff6ff;
+            --sidebar-bg: #0f172a; --sidebar-text: #94a3b8;
+            --success: #047857; --success-light: #ecfdf5;
+            --warning: #b45309; --warning-light: #fffbeb;
+            --danger: #b91c1c; --danger-light: #fef2f2;
+            --purple: #6d28d9; --purple-light: #f5f3ff;
+            --bg-body: #f1f5f9; --bg-card: #ffffff;
+            --border-color: #cbd5e1; --text-main: #0f172a; --text-muted: #475569;
+            --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px;
+            --font-heading: 'Outfit', sans-serif; --font-body: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: var(--font-body); background-color: var(--bg-body); color: var(--text-main); min-height: 100vh; flex-direction: column; display: flex; overflow-x: hidden; }
+
+        /* BARRA SUPERIOR DE SELECTOR DE MÓDULOS MULTIRROL */
+        .portal-switcher-bar {
+            background: #0f172a;
+            color: #fff;
+            padding: 0.65rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e293b;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            z-index: 50;
+        }
+        .portal-brand { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-heading); font-weight: 700; font-size: 1.05rem; }
+        .portal-nav-buttons { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+        .btn-portal-tab {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+            padding: 0.4rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.15s ease;
+        }
+        .btn-portal-tab:hover { color: #fff; background: #334155; }
+        .btn-portal-tab.active { background: #3b82f6; color: #fff; border-color: #60a5fa; }
+
+        /* PORTAL CONTAINERS */
+        .portal-container { display: none; width: 100%; min-height: calc(100vh - 55px); }
+        .portal-container.active { display: flex; }
+
+        /* ESTILOS DEL PORTAL DE LOGIN */
+        #portal-login {
+            background-color: #0f172a;
+            background-image: radial-gradient(circle at 50% 0%, #1e3a8a 0%, #0f172a 75%);
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1.5rem;
+        }
+        .login-card {
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 440px;
+            padding: 2.25rem 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            color: #fff;
+        }
+
+        /* ESTILOS COMUNES DE DASHBOARD Y PANELES */
+        .app-container { display: flex; width: 100%; min-height: calc(100vh - 55px); }
+        .sidebar { width: 250px; background: #0f172a; color: #fff; display: flex; flex-direction: column; border-right: 1px solid #1e293b; flex-shrink: 0; position: sticky; top: 0; height: calc(100vh - 55px); overflow-y: auto; }
+        .sidebar-header { padding: 1.2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e293b; }
+        .sidebar-nav { flex: 1; padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+        .sidebar-link { display: flex; align-items: center; gap: 0.85rem; padding: 0.7rem 0.85rem; color: #94a3b8; border-radius: 4px; border: none; background: transparent; width: 100%; cursor: pointer; font-weight: 600; font-size: 0.88rem; text-align: left; }
+        .sidebar-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+        .sidebar-link.active { color: #fff; background: #1e3a8a; }
+
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-x: hidden; }
+        .top-bar { background: #fff; border-bottom: 1px solid var(--border-color); padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .content-wrapper { padding: 1.5rem; flex: 1; overflow-y: auto; }
+
+        .vista-seccion { display: none; }
+        .vista-seccion.active { display: block; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .kpi-card { background: #fff; border-radius: 4px; padding: 1.25rem; display: flex; align-items: center; gap: 1rem; border: 1px solid var(--border-color); }
+        .kpi-icon { width: 44px; height: 44px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+        .kpi-card.blue .kpi-icon { background: #eff6ff; color: #1e3a8a; }
+        .kpi-card.green .kpi-icon { background: #ecfdf5; color: #047857; }
+        .kpi-card.red .kpi-icon { background: #fef2f2; color: #b91c1c; }
+        .kpi-card.purple .kpi-icon { background: #f5f3ff; color: #6d28d9; }
+
+        .dashboard-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem; }
+        .panel-box { background: #fff; border-radius: 4px; border: 1px solid var(--border-color); padding: 1.25rem; margin-bottom: 1.25rem; }
+        .panel-header { margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h3 { font-family: var(--font-heading); font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+
+        .carreras-bars { display: flex; flex-direction: column; gap: 0.75rem; }
+        .carrera-bar-item { display: flex; flex-direction: column; gap: 0.25rem; }
+        .bar-meta { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; }
+        .bar-bg { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 4px; }
+
+        .toolbar-box { background: #fff; padding: 1rem; border-radius: 4px; border: 1px solid var(--border-color); margin-bottom: 1.25rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+        .search-group { position: relative; flex: 1; min-width: 220px; }
+        .search-group input { width: 100%; padding: 0.55rem 0.85rem 0.55rem 2.2rem; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem; outline: none; }
+        .filters-group { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .select-filter { padding: 0.55rem 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.82rem; background: #fff; }
+
+        .estudiantes-grid, .asignaturas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+        .student-card, .grupo-card-compact { background: #fff; border: 1px solid var(--border-color); border-radius: 4px; padding: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+        .student-card-header { display: flex; align-items: center; gap: 0.75rem; }
+        .student-avatar, .student-avatar-vector {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+        .badge-activo { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+        .badge-riesgo { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .badge-egresado { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+
+        .btn { padding: 0.5rem 0.85rem; border-radius: 4px; font-weight: 600; font-size: 0.82rem; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 0.4rem; }
+        .btn-primary { background: #1e3a8a; color: #fff; }
+        .btn-secondary { background: #fff; border-color: #cbd5e1; color: #0f172a; }
+        .btn-success { background: #047857; color: #fff; }
+        .btn-outline-danger { background: transparent; border-color: #b91c1c; color: #b91c1c; }
+
+        .custom-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.85rem; }
+        .custom-table th { background: #f8fafc; padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #cbd5e1; color: #475569; font-weight: 700; }
+        .custom-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #cbd5e1; }
+
+        .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15,23,42,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
+        .modal-backdrop.active { display: flex; }
+        .modal-content { background: #fff; border-radius: 4px; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; padding: 1.25rem; border: 1px solid #cbd5e1; }
+
+        .risk-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.55rem; max-height: 260px; overflow-y: auto; }
+        .risk-item { background: #fef2f2; border: 1px solid #fecaca; border-left: 3.5px solid #dc2626; border-radius: 4px; padding: 0.45rem 0.6rem; display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; cursor: pointer; }
+        .risk-user { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+        .risk-user img { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #fca5a5; flex-shrink: 0; }
+        .risk-name { font-size: 0.8rem; font-weight: 700; color: #991b1b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .risk-badge { background: #dc2626; color: #fff; border-radius: 3px; padding: 0.15rem 0.4rem; font-size: 0.75rem; font-weight: 700; }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA DE SELECCIÓN DE PORTAL MULTIRROL EN VIVO -->
+    <div class="portal-switcher-bar">
+        <div class="portal-brand">
+            <i data-lucide="graduation-cap"></i> UniGestion PRO Live
+        </div>
+        <div class="portal-nav-buttons">
+            <span style="font-size:0.75rem; color:#94a3b8; margin-right:0.3rem;">Cambiar de Vista / Portal:</span>
+            <button class="btn-portal-tab active" onclick="switchPortal('portal-login')">
+                <i data-lucide="lock" style="width:14px; height:14px;"></i> Login / Autenticación
+            </button>
+            <button class="btn-portal-tab" onclick="switchPortal('portal-admin')">
+                <i data-lucide="shield-check" style="width:14px; height:14px;"></i> Administrador
+            </button>
+            <button class="btn-portal-tab" onclick="switchPortal('portal-teacher')">
+                <i data-lucide="user-check" style="width:14px; height:14px;"></i> Docente
+            </button>
+            <button class="btn-portal-tab" onclick="switchPortal('portal-student')">
+                <i data-lucide="graduation-cap" style="width:14px; height:14px;"></i> Estudiante
+            </button>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- PORTAL 1: AUTENTICACIÓN / LOGIN (/login)                           -->
+    <!-- =================================================================== -->
+    <div id="portal-login" class="portal-container active">
+        <div class="login-card">
+            <div style="text-align:center; margin-bottom:1.75rem;">
+                <div style="width:52px; height:52px; background:#1e3a8a; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; color:#fff; margin-bottom:0.75rem;">
+                    <i data-lucide="graduation-cap" style="width:30px; height:30px;"></i>
+                </div>
+                <h1 style="font-family:var(--font-heading); font-size:1.5rem; font-weight:800;">UniGestion PRO</h1>
+                <p style="font-size:0.82rem; color:#94a3b8;">Portal de Inicio de Sesión Multirrol</p>
+            </div>
+
+            <!-- Botones de Demostración Rápida -->
+            <div style="background:#0f172a; border:1px solid #334155; border-radius:6px; padding:0.75rem; margin-bottom:1.5rem;">
+                <div style="font-size:0.72rem; color:#f59e0b; font-weight:700; text-transform:uppercase; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.3rem;">
+                    <i data-lucide="sparkles" style="width:14px; height:14px;"></i> Probar Acceso Directo Demo (3 Roles)
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.4rem;">
+                    <button type="button" class="btn-portal-tab" style="justify-content:center;" onclick="loginDemoRole('admin')">
+                        <i data-lucide="shield-check" style="width:14px; height:14px; display:inline-block; vertical-align:-2px; margin-right:4px;"></i> Admin
+                    </button>
+                    <button type="button" class="btn-portal-tab" style="justify-content:center;" onclick="loginDemoRole('teacher')">
+                        <i data-lucide="user-check" style="width:14px; height:14px; display:inline-block; vertical-align:-2px; margin-right:4px;"></i> Docente
+                    </button>
+                    <button type="button" class="btn-portal-tab" style="justify-content:center;" onclick="loginDemoRole('student')">
+                        <i data-lucide="graduation-cap" style="width:14px; height:14px; display:inline-block; vertical-align:-2px; margin-right:4px;"></i> Estudiante
+                    </button>
+                </div>
+            </div>
+
+            <form id="form-login-demo" style="display:flex; flex-direction:column; gap:1.1rem;">
+                <div>
+                    <label style="font-size:0.8rem; font-weight:600; color:#cbd5e1; display:block; margin-bottom:0.35rem;">Usuario / Correo Institucional</label>
+                    <input type="text" id="inp-login-usr" placeholder="admin | docente@univ.edu | estudiante@univ.edu" style="width:100%; padding:0.6rem; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:0.88rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.8rem; font-weight:600; color:#cbd5e1; display:block; margin-bottom:0.35rem;">Contraseña</label>
+                    <input type="password" id="inp-login-pwd" placeholder="admin o 123" style="width:100%; padding:0.6rem; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fff; font-size:0.88rem;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="justify-content:center; padding:0.7rem; margin-top:0.4rem;">
+                    <i data-lucide="log-in"></i> Iniciar Sesión en la Plataforma
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- PORTAL 2: ADMINISTRADOR / RECTORÍA (/admin)                         -->
+    <!-- =================================================================== -->
+    <div id="portal-admin" class="portal-container">
+        <div class="app-container">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div style="display:flex; align-items:center; gap:0.6rem;">
+                        <div style="width:32px; height:32px; background:#1e3a8a; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff;"><i data-lucide="graduation-cap"></i></div>
+                        <div><h1 style="font-size:1rem; color:#fff;">UniGestion</h1><p style="font-size:0.68rem; color:#94a3b8;">Panel Rectoral</p></div>
+                    </div>
+                </div>
+                <nav class="sidebar-nav">
+                    <button class="sidebar-link active" onclick="switchAdminTab('adm-dash')"><i data-lucide="layout-dashboard"></i> <span>Dashboard</span></button>
+                    <button class="sidebar-link" onclick="switchAdminTab('adm-est')"><i data-lucide="users"></i> <span>Estudiantes (80)</span></button>
+                    <button class="sidebar-link" onclick="switchAdminTab('adm-pen')"><i data-lucide="book-open"></i> <span>Pensum y 20 Docentes</span></button>
+                    <button class="sidebar-link" onclick="switchAdminTab('adm-hor')"><i data-lucide="calendar"></i> <span>Horarios de Clases</span></button>
+                    <button class="sidebar-link" onclick="switchAdminTab('adm-gru')"><i data-lucide="layers"></i> <span>Grupos y Aulas</span></button>
+                    <button class="sidebar-link" onclick="switchAdminTab('adm-db')"><i data-lucide="database"></i> <span>Base de Datos SQLite</span></button>
+                    <button class="sidebar-link" onclick="switchAdminTab('adm-sol')"><i data-lucide="arrow-right-left"></i> <span>Solicitudes de Cambio</span> <span id="spa-badge-solicitudes" class="badge badge-riesgo" style="margin-left:auto; font-size:0.68rem; padding:0.1rem 0.4rem; border-radius:10px;">1</span></button>
+                </nav>
+            </aside>
+
+            <main class="main-content">
+                <header class="top-bar">
+                    <div>
+                        <h2 style="font-family:var(--font-heading); font-size:1.15rem; font-weight:700;">Panel General de Administración</h2>
+                        <p style="font-size:0.8rem; color:#64748b;">Despacho de Rectoría • Control Académico e Indicadores</p>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.6rem;">
+                        <span class="badge badge-activo">Administrador</span>
+                        <strong style="font-size:0.85rem;">Rectoría Universitaria</strong>
+                    </div>
+                </header>
+
+                <div class="content-wrapper">
+                    <!-- ADMIN TAB 1: DASHBOARD -->
+                    <section id="adm-dash" class="vista-seccion active">
+                        <div class="kpi-grid">
+                            <div class="kpi-card blue"><div class="kpi-icon"><i data-lucide="users"></i></div><div><span style="font-size:0.75rem; color:#64748b; font-weight:700;">TOTAL ESTUDIANTES</span><h3 style="font-size:1.6rem;">80</h3></div></div>
+                            <div class="kpi-card green"><div class="kpi-icon"><i data-lucide="award"></i></div><div><span style="font-size:0.75rem; color:#64748b; font-weight:700;">PROMEDIO GENERAL</span><h3 style="font-size:1.6rem;">3.88</h3></div></div>
+                            <div class="kpi-card red"><div class="kpi-icon"><i data-lucide="alert-triangle"></i></div><div><span style="font-size:0.75rem; color:#64748b; font-weight:700;">EN RIESGO</span><h3 style="font-size:1.6rem;">12</h3></div></div>
+                            <div class="kpi-card purple"><div class="kpi-icon"><i data-lucide="book-marked"></i></div><div><span style="font-size:0.75rem; color:#64748b; font-weight:700;">ASIGNATURAS</span><h3 style="font-size:1.6rem;">52</h3></div></div>
+                        </div>
+
+                        <div class="dashboard-panels">
+                            <div class="panel-box flex-2">
+                                <div class="panel-header"><h3><i data-lucide="pie-chart"></i> Distribución y Cupos por Carrera (Máx 30 Estudiantes)</h3></div>
+                                <div id="admin-donut-box" style="display:flex; justify-content:center; align-items:center; gap:1.5rem; flex-wrap:wrap; padding:0.5rem 0;"></div>
+                            </div>
+                            <div class="panel-box flex-1">
+                                <div class="panel-header"><h3><i data-lucide="shield-alert"></i> Alertas de Riesgo Académico (&lt; 3.5)</h3></div>
+                                <div id="admin-risk-list" class="risk-list"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ADMIN TAB 2: ESTUDIANTES -->
+                    <section id="adm-est" class="vista-seccion">
+                        <div class="toolbar-box">
+                            <div class="search-group">
+                                <i data-lucide="search" style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); color:#94a3b8; width:16px;"></i>
+                                <input type="text" id="adm-search-est" placeholder="Buscar por estudiante, matrícula o correo...">
+                            </div>
+                            <div class="filters-group">
+                                <select id="adm-filter-pago" class="select-filter">
+                                    <option value="">Estado de Pago (Todos)</option>
+                                    <option value="Al día">Al día</option>
+                                    <option value="Pendiente">Pendiente</option>
+                                    <option value="Bloqueado">Bloqueado</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="adm-grid-estudiantes" class="estudiantes-grid"></div>
+                    </section>
+
+                    <!-- ADMIN TAB 3: PENSUM -->
+                    <section id="adm-pen" class="vista-seccion">
+                        <div id="adm-grid-asignaturas" class="asignaturas-grid"></div>
+                    </section>
+
+                    <!-- ADMIN TAB 4: HORARIOS -->
+                    <section id="adm-hor" class="vista-seccion">
+                        <div class="panel-box">
+                            <div class="panel-header"><h3><i data-lucide="calendar"></i> Matriz Semanal de Horarios de Clases</h3></div>
+                            <table class="custom-table">
+                                <thead><tr><th style="width:140px; text-align:center;">Bloque Horario</th><th>Lunes</th><th>Martes</th><th>Miércoles</th><th>Jueves</th><th>Viernes</th></tr></thead>
+                                <tbody id="adm-tbody-horarios"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- ADMIN TAB 5: GRUPOS -->
+                    <section id="adm-gru" class="vista-seccion">
+                        <div id="adm-grid-grupos" class="asignaturas-grid"></div>
+                    </section>
+
+                    <!-- ADMIN TAB 6: BASE DE DATOS -->
+                    <section id="adm-db" class="vista-seccion">
+                        <div id="adm-db-inspector"></div>
+                    </section>
+
+                    <!-- ADMIN TAB 7: SOLICITUDES DE CAMBIO DE GRUPO -->
+                    <section id="adm-sol" class="vista-seccion">
+                        <div class="panel-box" style="margin-bottom:1.25rem;">
+                            <div class="panel-header"><h3><i data-lucide="arrow-right-left"></i> Centro de Solicitudes de Cambio de Grupo y Horario</h3></div>
+                            <div style="padding:1rem;">
+                                <p style="font-size:0.85rem; color:#64748b; margin-bottom:1rem;">Revisión y dictamen de trámites estudiantiles. Al aprobar se actualiza el grupo del estudiante y se genera una notificación interna. Al rechazar se conserva su sección actual.</p>
+                                
+                                <div class="kpi-grid" style="margin-bottom:1.25rem;">
+                                    <div class="kpi-card blue"><div class="kpi-icon"><i data-lucide="inbox"></i></div><div><span style="font-size:0.75rem; color:#64748b; font-weight:700;">TOTAL</span><h3 id="spa-kpi-total" style="font-size:1.4rem;">2</h3></div></div>
+                                    <div class="kpi-card" style="background:#fffbeb; border-left:4px solid #f59e0b;"><div class="kpi-icon" style="color:#d97706; background:#fef3c7;"><i data-lucide="clock"></i></div><div><span style="font-size:0.75rem; color:#92400e; font-weight:700;">PENDIENTES</span><h3 id="spa-kpi-pendientes" style="font-size:1.4rem; color:#b45309;">1</h3></div></div>
+                                    <div class="kpi-card green"><div class="kpi-icon"><i data-lucide="check-circle-2"></i></div><div><span style="font-size:0.75rem; color:#64748b; font-weight:700;">APROBADAS</span><h3 id="spa-kpi-aprobadas" style="font-size:1.4rem;">1</h3></div></div>
+                                    <div class="kpi-card red"><div class="kpi-icon"><i data-lucide="x-circle"></i></div><div><span style="font-size:0.75rem; color:#64748b; font-weight:700;">RECHAZADAS</span><h3 id="spa-kpi-rechazadas" style="font-size:1.4rem;">0</h3></div></div>
+                                </div>
+
+                                <div class="table-container">
+                                    <table class="custom-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Folio</th>
+                                                <th>Fecha</th>
+                                                <th>Estudiante</th>
+                                                <th>Carrera</th>
+                                                <th>Asignatura</th>
+                                                <th>Cambio Solicitado</th>
+                                                <th>Motivo</th>
+                                                <th>Estado</th>
+                                                <th style="text-align:center;">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="spa-tbody-solicitudes"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- PORTAL 3: CLAUSTRO DOCENTE (/teacher)                              -->
+    <!-- =================================================================== -->
+    <div id="portal-teacher" class="portal-container">
+        <div style="width:100%; max-width:1150px; margin:0 auto; padding:1.5rem;">
+            <!-- HEADER DOCENTE -->
+            <div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:1.25rem; display:flex; align-items:center; gap:1.25rem; margin-bottom:1.5rem;">
+                <div style="width:56px; height:56px; background:#eff6ff; color:#1e3a8a; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem; border:1px solid #bfdbfe;">
+                    <i data-lucide="user-check"></i>
+                </div>
+                <div>
+                    <h3 style="font-family:var(--font-heading); font-size:1.3rem;">Dr. Roberto Gómez</h3>
+                    <p style="font-size:0.85rem; color:#64748b; margin-top:0.2rem;">Código: <code>DOC-001</code> • DNI: 1001001 • Doctor en Ciencias Matemáticas (ISW)</p>
+                </div>
+            </div>
+
+            <!-- MATERIAS ASIGNADAS -->
+            <div class="panel-box">
+                <div class="panel-header"><h3><i data-lucide="book-open"></i> Asignaturas Impartidas este Semestre</h3></div>
+                <div id="teacher-asgs-list" class="asignaturas-grid"></div>
+            </div>
+
+            <!-- MATRIZ DE HORARIO DE DOCENCIA -->
+            <div class="panel-box">
+                <div class="panel-header"><h3><i data-lucide="calendar"></i> Matriz de Horario Semanal Impartido</h3></div>
+                <table class="custom-table">
+                    <thead><tr><th style="width:140px; text-align:center;">Bloque Horario</th><th>Lunes</th><th>Martes</th><th>Miércoles</th><th>Jueves</th><th>Viernes</th></tr></thead>
+                    <tbody id="teacher-tbody-horarios"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- PORTAL 4: ESTUDIANTE (/student)                                    -->
+    <!-- =================================================================== -->
+    <div id="portal-student" class="portal-container">
+        <div class="app-container" style="min-height:auto; width:100%;">
+            <!-- MENÚ LATERAL ESTUDIANTE -->
+            <aside class="sidebar" style="width:220px; height:auto; position:relative;">
+                <div class="sidebar-header" style="padding:1rem;">
+                    <div style="display:flex; align-items:center; gap:0.6rem;">
+                        <div style="width:32px; height:32px; background:#1e3a8a; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff;">
+                            <i data-lucide="graduation-cap" style="width:18px; height:18px;"></i>
+                        </div>
+                        <div>
+                            <h4 style="font-size:0.9rem; color:#fff; font-family:var(--font-heading); margin:0;">UniGestion</h4>
+                            <p style="font-size:0.68rem; color:#94a3b8; margin:0;">Portal Alumno</p>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav" style="padding:0.75rem 0.6rem; gap:0.25rem;">
+                    <a href="#student-horario-box" class="sidebar-link active" style="padding:0.55rem 0.65rem; font-size:0.84rem;">
+                        <i data-lucide="calendar" style="width:16px; height:16px;"></i> <span>Mi Horario</span>
+                    </a>
+                    <a href="#student-notas-box" class="sidebar-link" style="padding:0.55rem 0.65rem; font-size:0.84rem;">
+                        <i data-lucide="award" style="width:16px; height:16px;"></i> <span>Mis Calificaciones</span>
+                    </a>
+                    <a href="#student-tramite-box" class="sidebar-link" style="padding:0.55rem 0.65rem; font-size:0.84rem;">
+                        <i data-lucide="book-open" style="width:16px; height:16px;"></i> <span>Inscripciones</span>
+                    </a>
+                    <a href="#student-pago-banner" class="sidebar-link" style="padding:0.55rem 0.65rem; font-size:0.84rem;">
+                        <i data-lucide="credit-card" style="width:16px; height:16px;"></i> <span>Pagos</span>
+                    </a>
+                    <button type="button" class="sidebar-link" onclick="openStudentNotifsModal()" style="padding:0.55rem 0.65rem; font-size:0.84rem;">
+                        <i data-lucide="bell" style="width:16px; height:16px;"></i> <span>Mensajes</span>
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- CONTENIDO PRINCIPAL ESTUDIANTE -->
+            <main class="main-content" style="padding:1.5rem; flex:1; min-width:0;">
+                <!-- BANNER DE ESTADO FINANCIERO -->
+                <div id="student-pago-banner" style="margin-bottom:1.25rem; border-radius:6px; padding:1rem; display:none;"></div>
+
+                <!-- HEADER ESTUDIANTE -->
+                <div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1.25rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <div id="student-hero-avatar-box"></div>
+                        <div>
+                            <h3 id="student-name-txt" style="font-family:var(--font-heading); font-size:1.3rem;">Sebastián Rodríguez Gutiérrez</h3>
+                            <p id="student-sub-txt" style="font-size:0.85rem; color:#64748b; margin-top:0.2rem;">Matrícula: <code>2024-ISW-001</code> • Ingeniería de Software • 3º Semestre</p>
+                            <div style="margin-top:0.4rem; display:flex; gap:0.5rem; align-items:center;">
+                                <span class="badge badge-activo">Activo</span>
+                                <span id="student-pago-badge" class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; display:inline-flex; align-items:center; gap:3px;">
+                                    <i data-lucide="alert-triangle" style="width:12px; height:12px;"></i> <span>Pago: Pendiente</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" onclick="openStudentNotifsModal()" style="position:relative;">
+                        <i data-lucide="bell"></i> Notificaciones
+                        <span id="notif-badge-counter" style="position:absolute; top:-5px; right:-5px; background:#ef4444; color:#fff; font-size:0.7rem; font-weight:800; border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px;">1</span>
+                    </button>
+                </div>
+
+                <!-- HORARIO SEMANAL INDIVIDUAL -->
+                <div id="student-horario-box" class="panel-box">
+                    <div class="panel-header"><h3><i data-lucide="calendar"></i> Mi Horario Semanal Individual de Clases</h3></div>
+                    <table class="custom-table">
+                        <thead><tr><th style="width:140px; text-align:center;">Bloque Horario</th><th>Lunes</th><th>Martes</th><th>Miércoles</th><th>Jueves</th><th>Viernes</th></tr></thead>
+                        <tbody id="student-tbody-horarios"></tbody>
+                    </table>
+                </div>
+
+                <!-- TRÁMITE DE GRUPO Y NOTAS -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+                    <div id="student-tramite-box" class="panel-box">
+                        <div class="panel-header"><h3><i data-lucide="arrow-right-left"></i> Solicitar Cambio de Grupo de Clase</h3></div>
+                        <div style="padding:1rem;">
+                            <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:1rem; border-radius:6px; margin-bottom:1rem;">
+                                <form id="form-student-swap" style="display:flex; flex-direction:column; gap:0.75rem;">
+                                    <div>
+                                        <label style="font-size:0.8rem; font-weight:700; color:#0369a1; display:block; margin-bottom:0.3rem;">Asignatura Matriculada:</label>
+                                        <select id="sel-student-asg" required style="width:100%; padding:0.5rem; border:1px solid #bae6fd; border-radius:4px; font-size:0.85rem;">
+                                            <option value="ISW-101">[Nivel 1] ISW-101 - Algoritmos y Lógica (Act: G1)</option>
+                                            <option value="ISW-201">[Nivel 2] ISW-201 - Bases de Datos Relacionales (Act: G1)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.8rem; font-weight:700; color:#0369a1; display:block; margin-bottom:0.3rem;">Grupo Destino Solicitado:</label>
+                                        <select id="sel-student-grupo" required style="width:100%; padding:0.5rem; border:1px solid #bae6fd; border-radius:4px; font-size:0.85rem;">
+                                            <option value="G1">Grupo G1</option>
+                                            <option value="G2">Grupo G2</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.8rem; font-weight:700; color:#0369a1; display:block; margin-bottom:0.3rem;">Motivo del Cambio (Opcional):</label>
+                                        <input type="text" id="inp-student-motivo" placeholder="Ej: Cruce laboral con turno mañana..." style="width:100%; padding:0.5rem; border:1px solid #bae6fd; border-radius:4px; font-size:0.85rem;">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="margin-top:0.3rem; justify-content:center;"><i data-lucide="send"></i> Enviar Solicitud a Administración</button>
+                                </form>
+                                <p style="font-size:0.73rem; color:#0369a1; margin-top:0.6rem; display:flex; align-items:center; gap:4px;">
+                                    <i data-lucide="info" style="width:13px; height:13px; flex-shrink:0;"></i> <span><strong>Aviso:</strong> La solicitud se registra con estado <em>PENDIENTE</em> para dictamen del Administrador.</span>
+                                </p>
+                            </div>
+
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                                    <h4 style="font-size:0.85rem; color:#1e293b; display:flex; align-items:center; gap:5px;">
+                                        <i data-lucide="file-text" style="width:15px; height:15px; color:#3b82f6;"></i> Mis Trámites Registrados
+                                    </h4>
+                                    <span id="spa-student-badge-tramites" class="badge" style="background:#e0f2fe; color:#0369a1; font-size:0.7rem;">1 trámite</span>
+                                </div>
+                                <div id="spa-student-lista-tramites" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="student-notas-box" class="panel-box">
+                        <div class="panel-header"><h3><i data-lucide="award"></i> Historial y Récord de Notas</h3></div>
+                        <table class="custom-table">
+                            <thead><tr><th>Código</th><th>Asignatura</th><th>Nivel</th><th>Nota</th><th>Estado</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>GEN-101</code></td><td>Cálculo y Análisis Matemático</td><td>Nivel 1</td><td><strong style="color:#047857;">4.2</strong></td><td><span class="badge badge-activo">Aprobado</span></td></tr>
+                                <tr><td><code>ISW-101</code></td><td>Algoritmos y Lógica de Programación</td><td>Nivel 1</td><td><strong style="color:#047857;">4.5</strong></td><td><span class="badge badge-activo">Aprobado</span></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- MODALES DE ASISTENCIA Y COBRANZA -->
+    <div id="modal-notifs-student" class="modal-backdrop">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem; margin-bottom:1rem;">
+                <h3><i data-lucide="bell"></i> Centro de Notificaciones</h3>
+                <button onclick="closeModal('modal-notifs-student')" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+            <div id="spa-notifs-container">
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #d97706; padding:0.85rem; border-radius:4px; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                    <i data-lucide="alert-triangle" style="width:20px; height:20px; color:#d97706; flex-shrink:0;"></i>
+                    <div>
+                        <strong style="color:#92400e; font-size:0.9rem;">AVISO DE COBRANZA: Pago Pendiente</strong>
+                        <p style="font-size:0.82rem; color:#334155; margin-top:0.2rem;">Tiene una cuota mensual pendiente de pago. Le solicitamos regularizar su saldo para evitar restricciones administrativas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const SPA_DATA = {
+            carreras: [
+                { id: "ISW", nombre: "Ingeniería de Software", codigo: "ISW", color: "#3b82f6" },
+                { id: "MED", nombre: "Medicina Humana", codigo: "MED", color: "#ef4444" },
+                { id: "DER", nombre: "Derecho y C. Políticas", codigo: "DER", color: "#8b5cf6" }
+            ],
+            estudiantes: [],
+            notificacionesEstudiante: [],
+            solicitudes: [
+                { id: 1, est_id: "EST-002", est_nombre: "Matías González Pérez", carrera_id: "ISW", asg_codigo: "ISW-101", asg_nombre: "Algoritmos y Lógica de Programación", grupo_actual: "G1", grupo_solicitado: "G2", motivo: "Cruce con turno laboral matutino.", estado: "PENDIENTE", fecha: "2026-09-03 15:30", resolucion: null },
+                { id: 2, est_id: "EST-005", est_nombre: "Victoria García López", carrera_id: "MED", asg_codigo: "ISW-201", asg_nombre: "Bases de Datos Relacionales", grupo_actual: "G2", grupo_solicitado: "G1", motivo: "Cercanía de transporte universitario.", estado: "APROBADO", fecha: "2026-09-02 10:15", resolucion: "2026-09-02 11:30" }
+            ]
+        };
+
+        function switchPortal(portalId) {
+            document.querySelectorAll('.portal-container').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.btn-portal-tab').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(portalId).classList.add('active');
+            event?.currentTarget?.classList?.add('active');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function loginDemoRole(role) {
+            if (role === 'admin') switchPortal('portal-admin');
+            if (role === 'teacher') switchPortal('portal-teacher');
+            if (role === 'student') switchPortal('portal-student');
+        }
+
+        function switchAdminTab(tabId) {
+            document.querySelectorAll('#portal-admin .vista-seccion').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('#portal-admin .sidebar-link').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event?.currentTarget?.classList?.add('active');
+            if (tabId === 'adm-sol') renderSpaAdminSolicitudes();
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function openStudentNotifsModal() {
+            document.getElementById('modal-notifs-student').classList.add('active');
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        document.getElementById('form-login-demo').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const usr = document.getElementById('inp-login-usr').value.toLowerCase();
+            if (usr.includes('admin')) switchPortal('portal-admin');
+            else if (usr.includes('docente') || usr.includes('doc-')) switchPortal('portal-teacher');
+            else switchPortal('portal-student');
+        });
+
+        document.getElementById('form-student-swap').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const asgVal = document.getElementById('sel-student-asg').value;
+            const asgNombre = asgVal === 'ISW-101' ? 'Algoritmos y Lógica de Programación' : 'Bases de Datos Relacionales';
+            const nuevoGrupo = document.getElementById('sel-student-grupo').value;
+            const motivo = document.getElementById('inp-student-motivo').value.trim() || 'Solicitud por motivos académicos o laborales.';
+
+            const yaPendiente = SPA_DATA.solicitudes.find(s => s.est_id === 'EST-001' && s.asg_codigo === asgVal && s.estado === 'PENDIENTE');
+            if (yaPendiente) {
+                alert("Ya tiene una solicitud pendiente de revisión por administración para esta asignatura.");
+                return;
+            }
+
+            const nuevaSol = {
+                id: SPA_DATA.solicitudes.length + 1,
+                est_id: 'EST-001',
+                est_nombre: 'Sebastián Rodríguez Gutiérrez',
+                carrera_id: 'ISW',
+                asg_codigo: asgVal,
+                asg_nombre: asgNombre,
+                grupo_actual: 'G1',
+                grupo_solicitado: nuevoGrupo,
+                motivo: motivo,
+                estado: 'PENDIENTE',
+                fecha: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                resolucion: null
+            };
+            SPA_DATA.solicitudes.unshift(nuevaSol);
+
+            alert("Solicitud enviada, pendiente de revisión por administración.");
+            document.getElementById('inp-student-motivo').value = '';
+            renderSpaStudentSolicitudes();
+            renderSpaAdminSolicitudes();
+        });
+
+        function renderSpaStudentSolicitudes() {
+            const cont = document.getElementById('spa-student-lista-tramites');
+            const badge = document.getElementById('spa-student-badge-tramites');
+            if (!cont) return;
+
+            const misSol = SPA_DATA.solicitudes.filter(s => s.est_id === 'EST-001');
+            if (badge) badge.innerText = `${misSol.length} trámite${misSol.length === 1 ? '' : 's'}`;
+
+            if (misSol.length === 0) {
+                cont.innerHTML = '<div style="text-align:center; padding:0.6rem; color:#64748b; font-size:0.78rem;">No registra solicitudes de cambio de grupo.</div>';
+                return;
+            }
+
+            cont.innerHTML = misSol.map(s => {
+                let badgeClass = s.estado === 'PENDIENTE' ? 'badge-riesgo' : (s.estado === 'APROBADO' ? 'badge-activo' : 'badge-egresado');
+                let badgeStyle = s.estado === 'PENDIENTE' ? 'background:#fef3c7; color:#92400e; border:1px solid #fde68a;' : '';
+                let statusMsg = s.estado === 'PENDIENTE' ? 'Solicitud enviada, pendiente de revisión por administración.' : (s.estado === 'APROBADO' ? 'Aprobado por administración. Grupo y horario actualizados.' : 'Rechazado por administración.');
+                return `
+                    <div style="background:#fff; border:1px solid #bae6fd; border-radius:4px; padding:0.6rem; font-size:0.78rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <strong><code>${s.asg_codigo}</code> ${s.asg_nombre}</strong>
+                            <span class="badge ${badgeClass}" style="${badgeStyle}">${s.estado}</span>
+                        </div>
+                        <div style="color:#64748b; margin-top:2px;">Grupo actual: <strong>${s.grupo_actual}</strong> ➔ Solicitado: <strong style="color:#0369a1;">Grupo ${s.grupo_solicitado}</strong> (${s.fecha})</div>
+                        <div style="font-size:0.73rem; color:${s.estado === 'PENDIENTE' ? '#b45309' : (s.estado === 'APROBADO' ? '#15803d' : '#b91c1c')}; font-weight:600; margin-top:2px;">
+                            ${statusMsg}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderSpaAdminSolicitudes() {
+            const tbody = document.getElementById('spa-tbody-solicitudes');
+            if (!tbody) return;
+
+            const total = SPA_DATA.solicitudes.length;
+            const pendientes = SPA_DATA.solicitudes.filter(s => s.estado === 'PENDIENTE').length;
+            const aprobadas = SPA_DATA.solicitudes.filter(s => s.estado === 'APROBADO').length;
+            const rechazadas = SPA_DATA.solicitudes.filter(s => s.estado === 'RECHAZADO').length;
+
+            const elTotal = document.getElementById('spa-kpi-total');
+            const elPend = document.getElementById('spa-kpi-pendientes');
+            const elAprob = document.getElementById('spa-kpi-aprobadas');
+            const elRech = document.getElementById('spa-kpi-rechazadas');
+            const badgeNav = document.getElementById('spa-badge-solicitudes');
+
+            if (elTotal) elTotal.innerText = total;
+            if (elPend) elPend.innerText = pendientes;
+            if (elAprob) elAprob.innerText = aprobadas;
+            if (elRech) elRech.innerText = rechazadas;
+
+            if (badgeNav) {
+                badgeNav.innerText = pendientes;
+                badgeNav.style.display = pendientes > 0 ? 'inline-block' : 'none';
+            }
+
+            tbody.innerHTML = SPA_DATA.solicitudes.map(s => {
+                let badgeStyle = s.estado === 'PENDIENTE' ? 'background:#fef3c7; color:#92400e; border:1px solid #fde68a;' : (s.estado === 'APROBADO' ? 'background:#dcfce7; color:#15803d; border:1px solid #86efac;' : 'background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;');
+                let actionsHtml = s.estado === 'PENDIENTE' ? `
+                    <div style="display:flex; gap:0.4rem; justify-content:center;">
+                        <button class="btn btn-success" style="padding:0.3rem 0.55rem; font-size:0.72rem;" onclick="dictaminarSpaSolicitud(${s.id}, 'aprobar')"><i data-lucide="check"></i> Aprobar</button>
+                        <button class="btn btn-outline-danger" style="padding:0.3rem 0.55rem; font-size:0.72rem;" onclick="dictaminarSpaSolicitud(${s.id}, 'rechazar')"><i data-lucide="x"></i> Rechazar</button>
+                    </div>
+                ` : `<span style="font-size:0.75rem; color:#64748b;">${s.resolucion ? 'Resuelto: ' + s.resolucion : 'Resuelto'}</span>`;
+
+                return `
+                    <tr>
+                        <td><strong>#${s.id}</strong></td>
+                        <td style="font-size:0.75rem; color:#64748b;">${s.fecha}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:0.4rem;">
+                                ${generarAvatarFlatUI(s.est_nombre, s.est_id, 28)}
+                                <div><strong>${s.est_nombre}</strong><br><code style="font-size:0.7rem;">${s.est_id}</code></div>
+                            </div>
+                        </td>
+                        <td><span class="badge badge-activo">${s.carrera_id}</span></td>
+                        <td><strong>${s.asg_nombre}</strong><br><code style="font-size:0.7rem;">${s.asg_codigo}</code></td>
+                        <td><span>Grupo ${s.grupo_actual} ➔ <strong style="color:#0369a1;">Grupo ${s.grupo_solicitado}</strong></span></td>
+                        <td style="font-size:0.75rem; color:#475569; max-width:180px;">${s.motivo}</td>
+                        <td><span class="badge" style="${badgeStyle}">${s.estado}</span></td>
+                        <td>${actionsHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function dictaminarSpaSolicitud(id, accion) {
+            const sol = SPA_DATA.solicitudes.find(s => s.id === id);
+            if (!sol) return;
+
+            const ahora = new Date().toISOString().replace('T', ' ').substring(0, 16);
+            if (accion === 'aprobar') {
+                sol.estado = 'APROBADO';
+                sol.resolucion = ahora;
+                SPA_DATA.notificacionesEstudiante.unshift({
+                    titulo: '✅ Solicitud de Cambio de Grupo APROBADA',
+                    mensaje: `Su solicitud para cambiar al Grupo ${sol.grupo_solicitado} en '${sol.asg_nombre}' ha sido APROBADA por administración institucional. Su horario fue actualizado.`,
+                    fecha: ahora,
+                    tipo: 'aprobado'
+                });
+                alert(`Solicitud #${id} aprobada con éxito.\n\nSe ha reasignado al estudiante al Grupo ${sol.grupo_solicitado} y se ha generado la notificación interna.`);
+            } else {
+                sol.estado = 'RECHAZADO';
+                sol.resolucion = ahora;
+                SPA_DATA.notificacionesEstudiante.unshift({
+                    titulo: '❌ Solicitud de Cambio de Grupo RECHAZADA',
+                    mensaje: `Su solicitud para cambiar al Grupo ${sol.grupo_solicitado} en '${sol.asg_nombre}' ha sido RECHAZADA por administración institucional. Motivo: Aforo completo.`,
+                    fecha: ahora,
+                    tipo: 'rechazado'
+                });
+                alert(`Solicitud #${id} rechazada por administración.\n\nSe mantiene el grupo actual del estudiante y se ha emitido la notificación.`);
+            }
+            actualizarNotificacionesEstudianteSPA();
+            renderSpaAdminSolicitudes();
+            renderSpaStudentSolicitudes();
+        }
+
+        function actualizarNotificacionesEstudianteSPA() {
+            const container = document.getElementById('spa-notifs-container');
+            if (!container) return;
+            const notifsHtml = SPA_DATA.notificacionesEstudiante.map(n => `
+                <div style="background:${n.tipo === 'aprobado' ? '#ecfdf5' : '#fef2f2'}; border:1px solid ${n.tipo === 'aprobado' ? '#a7f3d0' : '#fecaca'}; border-left:4px solid ${n.tipo === 'aprobado' ? '#059669' : '#dc2626'}; padding:0.85rem; border-radius:4px; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                    <i data-lucide="${n.tipo === 'aprobado' ? 'check-circle-2' : 'x-circle'}" style="width:20px; height:20px; color:${n.tipo === 'aprobado' ? '#059669' : '#dc2626'}; flex-shrink:0;"></i>
+                    <div>
+                        <strong style="color:${n.tipo === 'aprobado' ? '#065f46' : '#991b1b'}; font-size:0.9rem;">${n.titulo}</strong>
+                        <p style="font-size:0.82rem; color:#334155; margin-top:0.2rem;">${n.mensaje}</p>
+                        <small style="color:#94a3b8; font-size:0.7rem;">${n.fecha}</small>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = notifsHtml + `
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #d97706; padding:0.85rem; border-radius:4px; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                    <i data-lucide="alert-triangle" style="width:20px; height:20px; color:#d97706; flex-shrink:0;"></i>
+                    <div>
+                        <strong style="color:#92400e; font-size:0.9rem;">AVISO DE COBRANZA: Pago Pendiente</strong>
+                        <p style="font-size:0.82rem; color:#334155; margin-top:0.2rem;">Tiene una cuota mensual pendiente de pago. Le solicitamos regularizar su saldo para evitar restricciones administrativas.</p>
+                    </div>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+        }
+
+
+        function generarAvatarFlatUI(nombre, id, tamano = 40) {
+            const paleta = [
+                { bg: '#dbeafe', stroke: '#1e40af' }, // Azul
+                { bg: '#ede9fe', stroke: '#5b21b6' }, // Púrpura
+                { bg: '#d1fae5', stroke: '#065f46' }, // Esmeralda
+                { bg: '#fef3c7', stroke: '#92400e' }, // Ámbar
+                { bg: '#fee2e2', stroke: '#991b1b' }, // Carmesí
+                { bg: '#e0e7ff', stroke: '#3730a3' }, // Índigo
+                { bg: '#ccfbf1', stroke: '#115e59' }, // Turquesa
+                { bg: '#fae8ff', stroke: '#86198f' }  // Magenta
+            ];
+            let hash = 0;
+            const str = (id || '') + (nombre || '');
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            const c = paleta[Math.abs(hash) % paleta.length];
+            const iconSize = Math.max(13, Math.round(tamano * 0.55));
+            return `
+                <div class="student-avatar-vector" style="width:${tamano}px; height:${tamano}px; min-width:${tamano}px; min-height:${tamano}px; border-radius:50%; background:${c.bg}; border:1.5px solid ${c.stroke}; display:flex; align-items:center; justify-content:center; flex-shrink:0;" title="${nombre}">
+                    <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="${c.stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Seed 80 estudiantes demo
+            const nombres = ["Sebastián Rodríguez", "Matías González", "Andrea Pérez", "Camila Silva", "Diego Morales", "Sofía Vargas", "Lucas Castillo", "Valentina Navarro", "Gabriel Mendoza", "Lucía Ortiz"];
+            const carreras = ["ISW", "MED", "DER"];
+            for (let i = 1; i <= 80; i++) {
+                const c = carreras[i % 3];
+                const sem = (i % 8) + 1;
+                const prom = parseFloat((3.0 + (i % 20) * 0.1).toFixed(2));
+                SPA_DATA.estudiantes.push({
+                    id: `EST-${i.toString().padStart(3, '0')}`,
+                    matricula: `2024-${c}-${i.toString().padStart(3, '0')}`,
+                    nombre: `${nombres[i % nombres.length]} ${i}`,
+                    email: `estudiante.${i}@universidad.edu`,
+                    carrera_id: c, semestre: sem, promedio: prom,
+                    estado: prom < 3.5 ? "En Riesgo" : "Activo",
+                    estado_pago: i % 6 === 0 ? "Bloqueado" : (i % 4 === 0 ? "Pendiente" : "Al día")
+                });
+            }
+
+            // Render Admin Grid
+            const gridEst = document.getElementById('adm-grid-estudiantes');
+            gridEst.innerHTML = SPA_DATA.estudiantes.map(e => `
+                <div class="student-card">
+                    <div class="student-card-header">
+                        ${generarAvatarFlatUI(e.nombre, e.id, 40)}
+                        <div>
+                            <h4 style="font-size:0.9rem;">${e.nombre}</h4>
+                            <code style="font-size:0.75rem;">${e.matricula}</code>
+                            <div style="margin-top:0.2rem; display:flex; gap:0.3rem;">
+                                <span class="badge ${e.promedio < 3.5 ? 'badge-riesgo' : 'badge-activo'}">${e.estado}</span>
+                                <span class="badge" style="background:${e.estado_pago === 'Bloqueado' ? '#fee2e2' : (e.estado_pago === 'Pendiente' ? '#fef3c7' : '#dcfce7')};">${e.estado_pago}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size:0.8rem; color:#64748b;">
+                        Carrera: <strong>${e.carrera_id}</strong> • Semestre: ${e.semestre}º<br>
+                        Promedio: <strong style="color:${e.promedio < 3.5 ? '#b91c1c' : '#047857'};">${e.promedio.toFixed(2)}</strong>
+                    </div>
+                </div>
+            `).join('');
+
+            // Render Admin Risk List
+            const riskBox = document.getElementById('admin-risk-list');
+            const enRiesgo = SPA_DATA.estudiantes.filter(e => e.promedio < 3.5);
+            riskBox.innerHTML = enRiesgo.map(e => `
+                <div class="risk-item">
+                    <div class="risk-user">
+                        ${generarAvatarFlatUI(e.nombre, e.id, 28)}
+                        <div><div class="risk-name">${e.nombre}</div><div class="risk-sub">${e.carrera_id} • Sem. ${e.semestre}º</div></div>
+                    </div>
+                    <div class="risk-badge">${e.promedio.toFixed(1)}</div>
+                </div>
+            `).join('');
+
+            // Render Teacher Asgs List
+            document.getElementById('teacher-asgs-list').innerHTML = `
+                <div class="grupo-card-compact" style="border-left:4px solid #1e3a8a;">
+                    <div style="display:flex; justify-content:space-between;"><code>GEN-101</code><span class="badge badge-activo">G1 • Aula 101</span></div>
+                    <h4 style="font-size:0.95rem;">Cálculo y Análisis Matemático</h4>
+                    <div style="font-size:0.8rem; color:#64748b;">Nivel 1 • Lun-Mié 07:00-09:00 (15 Alumnos)</div>
+                </div>
+                <div class="grupo-card-compact" style="border-left:4px solid #1e3a8a;">
+                    <div style="display:flex; justify-content:space-between;"><code>ISW-101</code><span class="badge badge-activo">G1 • Lab 1</span></div>
+                    <h4 style="font-size:0.95rem;">Algoritmos y Lógica de Programación</h4>
+                    <div style="font-size:0.8rem; color:#64748b;">Nivel 1 • Mar-Jue 07:00-09:00 (10 Alumnos)</div>
+                </div>
+            `;
+
+            // Render Student Hero Avatar
+            const heroAvatarBox = document.getElementById('student-hero-avatar-box');
+            if (heroAvatarBox) {
+                heroAvatarBox.innerHTML = generarAvatarFlatUI("Sebastián Rodríguez", "EST-001", 56);
+            }
+
+            // Render Student Pago Banner
+            const banner = document.getElementById('student-pago-banner');
+            banner.style.display = 'block';
+            banner.innerHTML = `
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #d97706; padding:0.85rem; border-radius:6px; font-size:0.85rem; color:#92400e; display:flex; align-items:center; gap:0.5rem;">
+                    <i data-lucide="alert-triangle" style="width:20px; height:20px; color:#d97706; flex-shrink:0;"></i>
+                    <div>
+                        <strong>Aviso de Cobranza Pendiente:</strong> Registra una cuota mensual pendiente de pago. Le invitamos a regularizar su arancel antes de fin de mes.
+                    </div>
+                </div>
+            `;
+
+            renderSpaAdminSolicitudes();
+            renderSpaStudentSolicitudes();
+
+            if (window.lucide) lucide.createIcons();
+        });
+    </script>
+
+</body>
+</html>

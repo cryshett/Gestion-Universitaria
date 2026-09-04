@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniGestion | Portal del Estudiante Universitario</title>
+    
+    <!-- Fuentes Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Hojas de Estilos CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+    <style>
+        .student-profile-hero {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .student-hero-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- MENÚ LATERAL ESTUDIANTE -->
+        <aside class="sidebar" style="width:230px;">
+            <div class="sidebar-header" style="padding:1.1rem 1rem;">
+                <div style="display:flex; align-items:center; gap:0.65rem;">
+                    <div style="width:34px; height:34px; background:#1e3a8a; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;">
+                        <i data-lucide="graduation-cap" style="width:20px; height:20px;"></i>
+                    </div>
+                    <div>
+                        <h1 style="font-size:0.95rem; color:#fff; font-family:var(--font-heading); font-weight:700;">UniGestion</h1>
+                        <p style="font-size:0.68rem; color:#94a3b8;">Portal Alumno</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#sec-horario" class="sidebar-link active">
+                    <i data-lucide="calendar"></i> <span>Mi Horario</span>
+                </a>
+                <a href="#sec-notas" class="sidebar-link">
+                    <i data-lucide="award"></i> <span>Mis Calificaciones</span>
+                </a>
+                <a href="#sec-inscripciones" class="sidebar-link">
+                    <i data-lucide="book-open"></i> <span>Inscripciones</span>
+                </a>
+                <a href="#banner-alerta-financiera" class="sidebar-link">
+                    <i data-lucide="credit-card"></i> <span>Pagos</span>
+                </a>
+                <button type="button" class="sidebar-link" onclick="abrirModalNotificaciones()" style="text-align:left;">
+                    <i data-lucide="bell"></i> <span>Mensajes</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="/logout" class="btn btn-outline-danger" style="width:100%; font-size:0.8rem; text-decoration:none; justify-content:center;">
+                    <i data-lucide="log-out"></i> <span>Cerrar Sesión</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-content">
+            <!-- TOP BAR ESTUDIANTE -->
+            <header class="top-bar">
+                <div class="top-bar-title">
+                    <h2 style="font-size:1.15rem; font-family:var(--font-heading);"><i data-lucide="graduation-cap"></i> Portal de Alumno</h2>
+                    <p style="font-size:0.8rem; color:#64748b;">Mi Horario, Registro de Notas y Estado Financiero</p>
+                </div>
+                <div class="top-bar-actions" style="display:flex; align-items:center; gap:0.75rem;">
+                    <button type="button" class="btn btn-secondary" onclick="abrirModalNotificaciones()" style="position:relative;">
+                        <i data-lucide="bell"></i> Notificaciones
+                        <span id="notif-badge-counter" style="display:none; position:absolute; top:-5px; right:-5px; background:#ef4444; color:#fff; font-size:0.7rem; font-weight:800; border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px;">0</span>
+                    </button>
+                    <div style="display:flex; align-items:center; gap:0.5rem; background:#f1f5f9; padding:0.4rem 0.8rem; border-radius:4px; border:1px solid #e2e8f0;">
+                        <span class="badge badge-activo">Estudiante</span>
+                        <strong id="header-estudiante-nombre" style="font-size:0.85rem; color:#1e293b;">Cargando...</strong>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper" style="max-width:1150px; margin:0 auto; width:100%;">
+                
+                <!-- BANNER DE ALERTA DE PAGO (SI CORRESPONDE) -->
+                <div id="banner-alerta-financiera" style="display:none; margin-bottom:1.25rem; border-radius:6px; padding:1rem 1.25rem;"></div>
+
+                <!-- TARJETA HERO DEL ESTUDIANTE -->
+                <div id="student-hero-box" class="student-profile-hero" style="display:flex; align-items:center; gap:1.25rem;">
+                    <div id="estudiante-avatar-box"></div>
+                    <div>
+                        <h3 id="estudiante-nombre" style="font-family:var(--font-heading); font-size:1.35rem; color:var(--text-main);">Cargando expediente...</h3>
+                        <p id="estudiante-sub" style="font-size:0.88rem; color:var(--text-muted); margin-top:0.2rem;"></p>
+                        <div style="margin-top:0.4rem; display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+                            <span id="estudiante-estado-badge" class="badge badge-activo">Activo</span>
+                            <span id="estudiante-pago-badge" class="badge" style="background:#dcfce7; color:#166534; border:1px solid #86efac;">Pago: Al día</span>
+                            <span style="font-weight:700; font-size:0.9rem;">
+                                Promedio Ponderado: <span id="estudiante-promedio" style="font-size:1.1rem; color:#047857;">0.0</span> / 5.0
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 1: HORARIO INDIVIDUAL SEMANAL -->
+                <div id="sec-horario" class="panel-box">
+                    <div class="panel-header">
+                    <h3><i data-lucide="calendar"></i> Mi Horario Semanal Individual de Clases</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:140px; text-align:center;">Bloque Horario</th>
+                                    <th style="width:18%;">Lunes</th>
+                                    <th style="width:18%;">Martes</th>
+                                    <th style="width:18%;">Miércoles</th>
+                                    <th style="width:18%;">Jueves</th>
+                                    <th style="width:18%;">Viernes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-horario-estudiante"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 2: FORMULARIO DE CAMBIO DE GRUPO Y NÓMINA -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.25rem;">
+                
+                <!-- CAMBIO DE GRUPO CON VALIDACIÓN AUTOMÁTICA -->
+                <div id="sec-inscripciones" class="panel-box">
+                    <div class="panel-header">
+                        <h3><i data-lucide="arrow-right-left"></i> Solicitar Cambio de Grupo de Clase</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:1rem; margin-bottom:1rem;">
+                            <form id="form-estudiante-cambio" style="display:flex; flex-direction:column; gap:0.85rem;">
+                                <div>
+                                    <label style="font-size:0.82rem; font-weight:700; color:#0369a1; display:block; margin-bottom:0.3rem;">Asignatura Matriculada:</label>
+                                    <select id="select-estudiante-materia" required style="width:100%; padding:0.55rem; border:1px solid #bae6fd; border-radius:4px; font-size:0.85rem;">
+                                        <option value="">Seleccionar Asignatura...</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.82rem; font-weight:700; color:#0369a1; display:block; margin-bottom:0.3rem;">Grupo Destino Solicitado:</label>
+                                    <select id="select-estudiante-grupo" required style="width:100%; padding:0.55rem; border:1px solid #bae6fd; border-radius:4px; font-size:0.85rem;">
+                                        <option value="G1">Grupo G1</option>
+                                        <option value="G2">Grupo G2</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.82rem; font-weight:700; color:#0369a1; display:block; margin-bottom:0.3rem;">Motivo de la Solicitud (Opcional):</label>
+                                    <input type="text" id="input-estudiante-motivo" placeholder="Ej: Cruce con horario laboral o transporte..." style="width:100%; padding:0.55rem; border:1px solid #bae6fd; border-radius:4px; font-size:0.85rem;" />
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="margin-top:0.4rem; justify-content:center;">
+                                    <i data-lucide="send"></i> Enviar Solicitud a Administración
+                                </button>
+                            </form>
+                            <p style="font-size:0.75rem; color:#0369a1; margin-top:0.6rem; line-height:1.3; display:flex; align-items:center; gap:4px;">
+                                <i data-lucide="info" style="width:14px; height:14px; flex-shrink:0;"></i> <span><strong>Flujo Administrativo:</strong> La solicitud se registra con estado <em>PENDIENTE</em> y será revisada y resuelta por la Administración.</span>
+                            </p>
+                        </div>
+
+                        <!-- SEGUIMIENTO DE MIS SOLICITUDES DE TRÁMITE -->
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                                <h4 style="font-size:0.88rem; color:#1e293b; display:flex; align-items:center; gap:6px;">
+                                    <i data-lucide="file-text" style="width:16px; height:16px; color:#3b82f6;"></i> Mis Trámites y Solicitudes
+                                </h4>
+                                <span id="badge-total-tramites" class="badge" style="background:#e0f2fe; color:#0369a1; font-size:0.75rem;">0 trámites</span>
+                            </div>
+                            <div id="lista-mis-solicitudes" style="display:flex; flex-direction:column; gap:0.6rem;">
+                                <div style="text-align:center; padding:0.8rem; color:#64748b; font-size:0.8rem; background:#f8fafc; border-radius:4px; border:1px dashed #cbd5e1;">
+                                    No registra solicitudes de cambio de horario pendientes.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RECORD / TRANSCRIPT DE NOTAS -->
+                <div id="sec-notas" class="panel-box">
+                    <div class="panel-header">
+                        <h3><i data-lucide="award"></i> Historial y Récord de Notas</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-container">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Asignatura</th>
+                                        <th>Nivel</th>
+                                        <th>Nota</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-estudiante-notas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    </div>
+
+    <!-- MODAL CENTRO DE NOTIFICACIONES DEL ESTUDIANTE -->
+    <div id="modal-notificaciones-estudiante" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i data-lucide="bell"></i> Centro de Notificaciones y Avisos</h3>
+                <button class="btn-close-modal" onclick="cerrarModalNotificaciones()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="lista-notificaciones-box" style="display:flex; flex-direction:column; gap:0.75rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentEstId = null;
+
+        function generarAvatarFlatUI(nombre, id, tamano = 60) {
+            const paleta = [
+                { bg: '#dbeafe', stroke: '#1e40af' },
+                { bg: '#ede9fe', stroke: '#5b21b6' },
+                { bg: '#d1fae5', stroke: '#065f46' },
+                { bg: '#fef3c7', stroke: '#92400e' },
+                { bg: '#fee2e2', stroke: '#991b1b' },
+                { bg: '#e0e7ff', stroke: '#3730a3' },
+                { bg: '#ccfbf1', stroke: '#115e59' },
+                { bg: '#fae8ff', stroke: '#86198f' }
+            ];
+            let hash = 0;
+            const str = (id || '') + (nombre || '');
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            const c = paleta[Math.abs(hash) % paleta.length];
+            const iconSize = Math.round(tamano * 0.55);
+            return `
+                <div style="width:${tamano}px; height:${tamano}px; min-width:${tamano}px; min-height:${tamano}px; border-radius:50%; background:${c.bg}; border:2px solid ${c.stroke}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="${c.stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.lucide) lucide.createIcons();
+
+            document.querySelectorAll('.btn-close-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('modal-notificaciones-estudiante').classList.remove('active');
+                });
+            });
+
+            try {
+                const me = await fetch('/api/me').then(r => r.json());
+                if (me.role !== 'student') {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                currentEstId = me.id;
+                document.getElementById('header-estudiante-nombre').innerText = me.nombre;
+                const avatarBox = document.getElementById('estudiante-avatar-box');
+                if (avatarBox) avatarBox.innerHTML = generarAvatarFlatUI(me.nombre, me.id, 64);
+                document.getElementById('estudiante-nombre').innerText = me.nombre;
+                document.getElementById('estudiante-sub').innerText = `Matrícula: ${me.matricula} • ${me.carrera_nombre} • Semestre ${me.semestre}º`;
+                document.getElementById('estudiante-promedio').innerText = me.promedio.toFixed(2);
+                document.getElementById('estudiante-estado-badge').innerText = me.estado;
+
+                // Renderizar Badge y Banner Financiero
+                renderEstadoPagoAlumno(me.estado_pago || 'Al día');
+
+                await cargarDatosAlumno(me.id);
+                await cargarNotificacionesAlumno(me.id);
+            } catch (err) {
+                console.error("Error al cargar portal estudiante:", err);
+            }
+        });
+
+        function renderEstadoPagoAlumno(estPago) {
+            const badge = document.getElementById('estudiante-pago-badge');
+            const banner = document.getElementById('banner-alerta-financiera');
+
+            if (estPago === 'Pendiente') {
+                badge.className = 'badge';
+                badge.style.cssText = 'background:#fef3c7; color:#92400e; border:1px solid #fde68a; display:inline-flex; align-items:center; gap:3px;';
+                badge.innerHTML = '<i data-lucide="alert-triangle" style="width:12px; height:12px;"></i> Pago: Pendiente';
+
+                banner.style.display = 'block';
+                banner.innerHTML = `
+                    <div style="background:#fffbeb; border:1px solid #fde68a; border-left:4.5px solid #d97706; padding:1rem; border-radius:6px; font-size:0.88rem; color:#92400e; display:flex; align-items:center; gap:0.75rem;">
+                        <i data-lucide="alert-triangle" style="width:24px; height:24px; flex-shrink:0; color:#d97706;"></i>
+                        <div>
+                            <strong>Aviso de Cobranza Pendiente:</strong> Registra un saldo/arancel pendiente de pago en la universidad. Le invitamos a regularizar su pago antes de la fecha límite para evitar bloqueos administrativos.
+                        </div>
+                    </div>
+                `;
+            } else if (estPago === 'Bloqueado') {
+                badge.className = 'badge';
+                badge.style.cssText = 'background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; display:inline-flex; align-items:center; gap:3px;';
+                badge.innerHTML = '<i data-lucide="shield-alert" style="width:12px; height:12px;"></i> Pago: Bloqueado';
+
+                banner.style.display = 'block';
+                banner.innerHTML = `
+                    <div style="background:#fef2f2; border:1px solid #fecaca; border-left:4.5px solid #dc2626; padding:1rem; border-radius:6px; font-size:0.88rem; color:#991b1b; display:flex; align-items:center; gap:0.75rem;">
+                        <i data-lucide="shield-alert" style="width:24px; height:24px; flex-shrink:0; color:#dc2626;"></i>
+                        <div>
+                            <strong>Alerta Crítica - Acceso Restringido:</strong> Su cuenta presenta un bloqueo financiero por mora en matrícula. Por favor acuda a la Caja Central de Tesorería para desbloquear su expediente.
+                        </div>
+                    </div>
+                `;
+            } else {
+                badge.className = 'badge';
+                badge.style.cssText = 'background:#dcfce7; color:#166534; border:1px solid #86efac; display:inline-flex; align-items:center; gap:3px;';
+                badge.innerHTML = '<i data-lucide="check-circle-2" style="width:12px; height:12px;"></i> Pago: Al día';
+
+                banner.style.display = 'none';
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        async function cargarNotificacionesAlumno(estId) {
+            try {
+                const res = await fetch(`/api/estudiantes/${estId}/notificaciones`).then(r => r.json());
+                const counter = document.getElementById('notif-badge-counter');
+                if (res.no_leidas > 0) {
+                    counter.innerText = res.no_leidas;
+                    counter.style.display = 'block';
+                } else {
+                    counter.style.display = 'none';
+                }
+
+                const list = document.getElementById('lista-notificaciones-box');
+                if (res.notificaciones.length === 0) {
+                    list.innerHTML = '<p class="text-muted" style="font-size:0.85rem; text-align:center;">No tiene notificaciones recibidas.</p>';
+                } else {
+                    list.innerHTML = res.notificaciones.map(n => `
+                        <div style="background:${n.leido ? '#f8fafc' : '#eff6ff'}; border:1px solid ${n.leido ? '#e2e8f0' : '#bfdbfe'}; border-left:3.5px solid ${n.tipo === 'pago' ? '#dc2626' : '#1e3a8a'}; border-radius:6px; padding:0.85rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                                <strong style="font-size:0.9rem; color:${n.tipo === 'pago' ? '#991b1b' : '#1e3a8a'};">${n.titulo}</strong>
+                                <small style="font-size:0.72rem; color:#64748b;">${n.fecha}</small>
+                            </div>
+                            <p style="font-size:0.82rem; color:#334155; margin-bottom:0.4rem; line-height:1.35;">${n.mensaje}</p>
+                            ${!n.leido ? `
+                                <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="marcarLeida('${n.id}')">
+                                    <i data-lucide="check" style="width:12px; height:12px;"></i> Marcar como Leída
+                                </button>
+                            ` : '<span style="font-size:0.72rem; color:#059669; font-weight:700; display:inline-flex; align-items:center; gap:2px;"><i data-lucide="check" style="width:12px; height:12px;"></i> Leída</span>'}
+                        </div>
+                    `).join('');
+                }
+                if (window.lucide) lucide.createIcons();
+            } catch (err) {
+                console.error("Error al cargar notificaciones:", err);
+            }
+        }
+
+        async function marcarLeida(notifId) {
+            await fetch(`/api/notificaciones/${notifId}/leida`, { method: 'POST' });
+            cargarNotificacionesAlumno(currentEstId);
+        }
+
+        function abrirModalNotificaciones() {
+            document.getElementById('modal-notificaciones-estudiante').classList.add('active');
+        }
+
+        function cerrarModalNotificaciones() {
+            document.getElementById('modal-notificaciones-estudiante').classList.remove('active');
+        }
+
+        async function cargarDatosAlumno(estId) {
+            // 1. Cargar horario individual
+            const resH = await fetch(`/api/estudiantes/${estId}/horario`).then(r => r.json());
+            renderHorarioAlumno(resH.matriz_horario);
+
+            // 2. Poblar select de cambio de grupo
+            const selectMat = document.getElementById('select-estudiante-materia');
+            selectMat.innerHTML = '<option value="">Seleccionar Asignatura Matriculada...</option>';
+            resH.materias.forEach(m => {
+                selectMat.innerHTML += `<option value="${m.id}">[Nivel ${m.nivel}] ${m.codigo} - ${m.nombre} (Act: ${m.grupo})</option>`;
+            });
+
+            // 3. Cargar notas
+            const resDet = await fetch(`/api/estudiantes/${estId}`).then(r => r.json());
+            const tbodyN = document.getElementById('tbody-estudiante-notas');
+            if (!resDet.inscripciones || resDet.inscripciones.length === 0) {
+                tbodyN.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:1rem; color:#64748b;">No hay asignaturas cursadas aún.</td></tr>';
+            } else {
+                tbodyN.innerHTML = resDet.inscripciones.map(i => `
+                    <tr>
+                        <td><code>${i.codigo}</code></td>
+                        <td><strong>${i.nombre}</strong></td>
+                        <td><span class="asg-level-badge level-${i.nivel}">Nivel ${i.nivel}</span></td>
+                        <td><strong style="color:${i.nota < 3.5 ? '#b91c1c' : '#047857'};">${i.nota.toFixed(1)}</strong></td>
+                        <td><span class="badge ${i.nota >= 3.5 ? 'badge-activo' : 'badge-riesgo'}">${i.nota >= 3.5 ? 'Aprobado' : 'Desaprobado'}</span></td>
+                    </tr>
+                `).join('');
+            }
+
+            // 4. Cargar solicitudes de trámite de horario
+            await cargarSolicitudesAlumno(estId);
+        }
+
+        async function cargarSolicitudesAlumno(estId) {
+            try {
+                const res = await fetch(`/api/estudiantes/${estId}/solicitudes`).then(r => r.json());
+                const cont = document.getElementById('lista-mis-solicitudes');
+                const badgeTotal = document.getElementById('badge-total-tramites');
+                
+                const solicitudes = res.solicitudes || [];
+                badgeTotal.innerText = `${solicitudes.length} trámite${solicitudes.length === 1 ? '' : 's'}`;
+
+                if (solicitudes.length === 0) {
+                    cont.innerHTML = `
+                        <div style="text-align:center; padding:0.8rem; color:#64748b; font-size:0.8rem; background:#f8fafc; border-radius:4px; border:1px dashed #cbd5e1;">
+                            No registra solicitudes de cambio de horario pendientes.
+                        </div>
+                    `;
+                    return;
+                }
+
+                cont.innerHTML = solicitudes.map(s => {
+                    let badgeColor = '';
+                    let statusIcon = '';
+                    let statusMsg = '';
+
+                    if (s.estado === 'PENDIENTE') {
+                        badgeColor = 'background:#fef3c7; color:#92400e; border:1px solid #fde68a;';
+                        statusIcon = 'clock';
+                        statusMsg = 'Solicitud enviada, pendiente de revisión por administración.';
+                    } else if (s.estado === 'APROBADO') {
+                        badgeColor = 'background:#dcfce7; color:#15803d; border:1px solid #86efac;';
+                        statusIcon = 'check-circle-2';
+                        statusMsg = 'Solicitud APROBADA por administración. Grupo y horario actualizados.';
+                    } else {
+                        badgeColor = 'background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;';
+                        statusIcon = 'x-circle';
+                        statusMsg = `Solicitud RECHAZADA por administración.${s.respuesta_admin ? ' Motivo: ' + s.respuesta_admin : ''}`;
+                    }
+
+                    return `
+                        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:0.75rem; font-size:0.82rem; display:flex; flex-direction:column; gap:0.35rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <strong style="color:#1e293b;"><code>${s.asignatura_codigo || ''}</code> ${s.asignatura_nombre}</strong>
+                                <span class="badge" style="${badgeColor} display:inline-flex; align-items:center; gap:4px; font-size:0.72rem;">
+                                    <i data-lucide="${statusIcon}" style="width:11px; height:11px;"></i> ${s.estado}
+                                </span>
+                            </div>
+                            <div style="color:#475569; display:flex; align-items:center; gap:6px;">
+                                <span>Grupo: <strong>${s.grupo_actual}</strong></span>
+                                <i data-lucide="arrow-right" style="width:12px; height:12px; color:#3b82f6;"></i>
+                                <span style="color:#0369a1; font-weight:700;">Grupo ${s.grupo_solicitado}</span>
+                                <span style="margin-left:auto; color:#94a3b8; font-size:0.72rem;">${s.fecha}</span>
+                            </div>
+                            <div style="font-size:0.74rem; color:${s.estado === 'PENDIENTE' ? '#b45309' : (s.estado === 'APROBADO' ? '#15803d' : '#b91c1c')}; font-weight:500;">
+                                ${statusMsg}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                if (window.lucide) lucide.createIcons();
+            } catch (err) {
+                console.error("Error al cargar solicitudes:", err);
+            }
+        }
+
+        function renderHorarioAlumno(matriz) {
+            const tbody = document.getElementById('tbody-horario-estudiante');
+            const bloques = [
+                { hora: "07:00-09:00", label: "07:00 AM - 09:00 AM" },
+                { hora: "09:00-11:00", label: "09:00 AM - 11:00 AM" },
+                { hora: "10:00-12:00", label: "10:00 AM - 12:00 PM" }
+            ];
+            const dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+
+            tbody.innerHTML = bloques.map(b => {
+                const celdas = dias.map(d => {
+                    const materias = matriz[b.hora][d] || [];
+                    if (materias.length === 0) {
+                        return '<td style="background:#fafafa; color:#cbd5e1; text-align:center; font-size:0.75rem;">— Libre —</td>';
+                    }
+                    return materias.map(m => `
+                        <td>
+                            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-left:3px solid #1e3a8a; padding:0.4rem; border-radius:4px; font-size:0.75rem;">
+                                <div style="font-weight:700; color:#1e3a8a;"><code>${m.codigo}</code> • ${m.nombre}</div>
+                                <div style="color:#64748b; font-size:0.7rem; margin-top:2px;">
+                                    <span style="display:inline-flex; align-items:center; gap:3px;"><i data-lucide="user-check" style="width:12px; height:12px;"></i> ${m.docente}</span><br>
+                                    <span style="display:inline-flex; align-items:center; gap:3px;"><i data-lucide="map-pin" style="width:12px; height:12px;"></i> ${m.grupo} • ${m.aula}</span>
+                                </div>
+                            </div>
+                        </td>
+                    `).join('');
+                }).join('');
+
+                return `
+                    <tr>
+                        <td style="text-align:center; font-weight:700; background:#f8fafc; font-size:0.8rem;">${b.label}</td>
+                        ${celdas}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        document.getElementById('form-estudiante-cambio').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const asgId = document.getElementById('select-estudiante-materia').value;
+            const nuevoGrupo = document.getElementById('select-estudiante-grupo').value;
+            const motivo = document.getElementById('input-estudiante-motivo').value;
+
+            if (!asgId || !nuevoGrupo) {
+                alert("Por favor seleccione la asignatura y el grupo destino.");
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/estudiantes/${currentEstId}/solicitar-cambio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ asignatura_id: asgId, nuevo_grupo: nuevoGrupo, motivo: motivo })
+                }).then(r => r.json());
+
+                if (res.error) {
+                    const msg = res.mensaje || (typeof res.error === 'string' ? res.error : 'No fue posible registrar la solicitud.');
+                    alert("Validación Rechazada:\n\n" + msg);
+                } else {
+                    alert("Solicitud Registrada:\n\n" + (res.mensaje || "Solicitud enviada exitosamente."));
+                    document.getElementById('input-estudiante-motivo').value = '';
+                    await cargarSolicitudesAlumno(currentEstId);
+                }
+            } catch (err) {
+                alert("Error al procesar solicitud de cambio de grupo.");
+            }
+        });
+
+    </script>
+</body>
+</html>

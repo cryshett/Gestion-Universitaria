@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniGestion | Portal de Autenticación Institucional</title>
+    
+    <!-- Fuentes Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-hover: #1e40af;
+            --bg-body: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-gold: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            background-image: radial-gradient(circle at 50% 0%, #1e3a8a 0%, #0f172a 75%);
+        }
+
+        .login-card {
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 440px;
+            padding: 2.25rem 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+        }
+
+        .brand-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .brand-logo {
+            width: 56px;
+            height: 56px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.5);
+        }
+
+        .brand-header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-header p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+
+        /* Demo Quick Login Tabs */
+        .demo-roles-box {
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .demo-title {
+            font-size: 0.72rem;
+            color: var(--accent-gold);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .demo-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.4rem;
+        }
+
+        .btn-demo {
+            background: #1e293b;
+            border: 1px solid var(--border-color);
+            color: #cbd5e1;
+            padding: 0.45rem 0.3rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s ease;
+        }
+
+        .btn-demo:hover {
+            border-color: var(--primary);
+            color: #fff;
+            background: #334155;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 0.4rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+            width: 18px;
+            height: 18px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.65rem 0.85rem 0.65rem 2.5rem;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: background 0.2s ease;
+            margin-top: 0.5rem;
+        }
+
+        .btn-submit:hover {
+            background: var(--primary-hover);
+        }
+
+        .alert-toast {
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            margin-bottom: 1.25rem;
+            display: none;
+        }
+
+        .alert-error {
+            background: rgba(220, 38, 38, 0.15);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid #10b981;
+            color: #6ee7b7;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="brand-header">
+            <div class="brand-logo">
+                <i data-lucide="graduation-cap" style="width: 32px; height: 32px;"></i>
+            </div>
+            <h1>UniGestion PRO</h1>
+            <p>Sistema de Gestión Académica y Control de Acceso</p>
+        </div>
+
+        <!-- Información de Seguridad Institucional -->
+        <div class="demo-roles-box" style="border-color: #3b82f6; background: rgba(30, 58, 138, 0.2);">
+            <div class="demo-title" style="color: #60a5fa;">
+                <i data-lucide="shield-check" style="width:14px; height:14px;"></i> Autenticación Segura MB-System
+            </div>
+            <p style="font-size: 0.78rem; color: #cbd5e1; margin-top: 0.25rem;">
+                Ingrese sus credenciales de usuario o correo institucional con protección Argon2 y JWT.
+            </p>
+        </div>
+
+        <div id="alert-box" class="alert-toast alert-error"></div>
+
+        <form id="form-login">
+            <div class="form-group">
+                <label for="input-usuario">Usuario o Correo Institucional</label>
+                <div class="input-wrapper">
+                    <i data-lucide="user"></i>
+                    <input type="text" id="input-usuario" class="form-control" placeholder="Ingrese su usuario o correo" required autocomplete="username">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="input-clave">Contraseña</label>
+                <div class="input-wrapper">
+                    <i data-lucide="lock"></i>
+                    <input type="password" id="input-clave" class="form-control" placeholder="Ingrese su contraseña" required autocomplete="current-password">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+                <i data-lucide="log-in"></i> Iniciar Sesión Segura
+            </button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) lucide.createIcons();
+        });
+
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('alert-box');
+            alertBox.style.display = 'none';
+
+            const usuario = document.getElementById('input-usuario').value;
+            const clave = document.getElementById('input-clave').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario, clave })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    alertBox.className = 'alert-toast alert-error';
+                    alertBox.innerText = data.mensaje || (typeof data.error === 'string' ? data.error : 'Credenciales inválidas');
+                    alertBox.style.display = 'block';
+                    return;
+                }
+
+                alertBox.className = 'alert-toast alert-success';
+                alertBox.innerText = data.mensaje || '¡Acceso concedido!';
+                alertBox.style.display = 'block';
+
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 400);
+            } catch (err) {
+                alertBox.className = 'alert-toast alert-error';
+                alertBox.innerText = 'Error de conexión con el servidor.';
+                alertBox.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

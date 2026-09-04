@@ -1,0 +1,10 @@
+# Dependencias del Proyecto UniGestion PRO
+Flask==3.0.0
+gunicorn==21.2.0
+mysql-connector-python==8.3.0
+sqlalchemy
+passlib[argon2]
+argon2-cffi
+pyjwt
+pydantic
+pydantic-settings

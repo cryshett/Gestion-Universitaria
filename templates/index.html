@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- 
+        index.html
+        ==========
+        Plantilla HTML5 Institucional con Menú Lateral Desplegable, Bordes Rectos,
+        y Visor Acordeón Interactivo de la Base de Datos SQLite.
+    -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniGestion PRO - Módulo Institucional de Gestión Universitaria</title>
+    
+    <!-- Fuentes de Google: Outfit y Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Iconos Lucide CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Hoja de Estilos CSS Institucional -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body>
+
+    <!-- CONTENEDOR PRINCIPAL CON MENÚ LATERAL -->
+    <div class="app-container">
+
+        <!-- ===================================================================== -->
+        <!-- MENÚ LATERAL DESPLEGABLE (SIDEBAR NAVIGATION DRAWER)                   -->
+        <!-- ===================================================================== -->
+        <aside id="sidebar-drawer" class="sidebar" role="navigation" aria-label="Menú Lateral Principal">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <div class="sidebar-brand-icon"><i data-lucide="graduation-cap"></i></div>
+                    <div class="sidebar-brand-text">
+                        <h1>UniGestion</h1>
+                        <p>Módulo Académico</p>
+                    </div>
+                </div>
+                <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" title="Plegar / Desplegar Menú Lateral" aria-label="Alternar Menú">
+                    <i data-lucide="panel-left-close"></i>
+                </button>
+            </div>
+
+            <!-- Navegación Vertical -->
+            <nav class="sidebar-nav">
+                <button class="sidebar-link active" data-target="vista-dashboard" aria-label="Dashboard">
+                    <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
+                </button>
+                <button class="sidebar-link" data-target="vista-estudiantes" aria-label="Estudiantes">
+                    <i data-lucide="users"></i> <span>Estudiantes (80)</span>
+                </button>
+                <button class="sidebar-link" data-target="vista-pensum" aria-label="Pensum Académico">
+                    <i data-lucide="book-open"></i> <span>Pensum y Niveles</span>
+                </button>
+                <button class="sidebar-link" data-target="vista-horarios" aria-label="Horarios y Grupos Académicos">
+                    <i data-lucide="calendar"></i> <span>Horarios de Clases</span>
+                </button>
+                <button class="sidebar-link" data-target="vista-grupos" aria-label="Grupos y Aulas">
+                    <i data-lucide="layers"></i> <span>Grupos y Aulas (Máx 15)</span>
+                </button>
+                <button class="sidebar-link" data-target="vista-basedatos" aria-label="Base de Datos SQLite">
+                    <i data-lucide="database"></i> <span>Base de Datos (SQLite)</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="btn-reset-db" class="btn btn-outline-danger" style="width:100%; font-size:0.78rem;" title="Restablecer la base de datos a los 50 estudiantes originales">
+                    <i data-lucide="rotate-ccw"></i> <span>Restablecer Demo</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ===================================================================== -->
+        <!-- ÁREA DE CONTENIDO PRINCIPAL (MAIN CONTENT)                            -->
+        <!-- ===================================================================== -->
+        <main class="main-content">
+            <!-- Barra Superior de Estado -->
+            <header class="top-bar">
+                <div class="page-title" id="active-page-title">Panel General (Dashboard)</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">
+                    Base de Datos: <code>universidad.db</code> • Estado: <strong style="color:var(--success);">Conectado</strong>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+
+                <!-- VISTA 1: DASHBOARD GENERAL (PANEL DE ADMINISTRACIÓN) -->
+                <section id="vista-dashboard" class="vista-seccion active">
+                    <!-- Métricas KPI del Sistema -->
+                    <div class="kpi-grid">
+                        <article class="kpi-card blue">
+                            <div class="kpi-icon"><i data-lucide="users"></i></div>
+                            <div class="kpi-info">
+                                <span class="kpi-title">Total Estudiantes</span>
+                                <h3 id="kpi-total-estudiantes">50</h3>
+                                <span class="kpi-subtitle">Repartidos en 5 carreras</span>
+                            </div>
+                        </article>
+
+                        <article class="kpi-card green">
+                            <div class="kpi-icon"><i data-lucide="award"></i></div>
+                            <div class="kpi-info">
+                                <span class="kpi-title">Promedio General</span>
+                                <h3 id="kpi-promedio-general">0.00</h3>
+                                <span class="kpi-subtitle">Escala decimal (0.0 - 5.0)</span>
+                            </div>
+                        </article>
+
+                        <article class="kpi-card green">
+                            <div class="kpi-icon"><i data-lucide="check-circle-2"></i></div>
+                            <div class="kpi-info">
+                                <span class="kpi-title">Tasa de Aprobación</span>
+                                <h3 id="kpi-tasa-aprobacion">0.0%</h3>
+                                <span class="kpi-subtitle">Notas &ge; 3.5 en inscripciones</span>
+                            </div>
+                        </article>
+
+                        <article class="kpi-card red">
+                            <div class="kpi-icon"><i data-lucide="alert-triangle"></i></div>
+                            <div class="kpi-info">
+                                <span class="kpi-title">Estudiantes en Riesgo</span>
+                                <h3 id="kpi-estudiantes-riesgo">0</h3>
+                                <span class="kpi-subtitle">Promedio ponderado &lt; 3.5</span>
+                            </div>
+                        </article>
+
+                        <article class="kpi-card purple">
+                            <div class="kpi-icon"><i data-lucide="user-check"></i></div>
+                            <div class="kpi-info">
+                                <span class="kpi-title">Docentes Activos</span>
+                                <h3 id="kpi-total-docentes">0</h3>
+                                <span class="kpi-subtitle">Cuerpo docente asignado</span>
+                            </div>
+                        </article>
+
+                        <article class="kpi-card blue">
+                            <div class="kpi-icon"><i data-lucide="book-marked"></i></div>
+                            <div class="kpi-info">
+                                <span class="kpi-title">Créditos del Catálogo</span>
+                                <h3 id="kpi-total-creditos">0</h3>
+                                <span class="kpi-subtitle">Total créditos 36 materias</span>
+                            </div>
+                        </article>
+                    </div>
+
+                    <!-- Paneles de Estadísticas para la Administración -->
+                    <div class="dashboard-panels">
+                        <div class="panel-box flex-2">
+                            <div class="panel-header">
+                                <h3><i data-lucide="pie-chart"></i> Gráfico de Distribución y Cupos por Carrera (Límite 30 Estudiantes)</h3>
+                            </div>
+                            <div class="panel-body" style="display:flex; flex-direction:column; gap:1.25rem;">
+                                <!-- Gráfico SVG Donut -->
+                                <div id="carreras-donut-wrapper" style="display:flex; align-items:center; justify-content:center; gap:2rem; flex-wrap:wrap; padding: 0.5rem 0;">
+                                    <div id="carreras-donut-svg-box"></div>
+                                    <div id="carreras-donut-legend" style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem;"></div>
+                                </div>
+                                <div id="carreras-barras-container" class="carreras-bars"></div>
+                            </div>
+                        </div>
+
+                        <div class="panel-box flex-2">
+                            <div class="panel-header">
+                                <h3><i data-lucide="bar-chart-3"></i> Promedio Acumulado Comparativo por Carrera</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div id="promedio-carreras-container" class="carreras-bars"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-panels">
+                        <div class="panel-box flex-2">
+                            <div class="panel-header">
+                                <h3><i data-lucide="layers"></i> Distribución de Estudiantes por Semestre (1º a 8º)</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div id="semestre-barras-container" class="carreras-bars"></div>
+                            </div>
+                        </div>
+
+                        <div class="panel-box flex-1">
+                            <div class="panel-header">
+                                <h3><i data-lucide="shield-alert"></i> Alertas de Riesgo (&lt; 3.5)</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div id="alertas-riesgo-lista" class="risk-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VISTA 2: GESTIÓN DE ESTUDIANTES -->
+                <section id="vista-estudiantes" class="vista-seccion">
+                    <div class="toolbar-box">
+                        <div class="search-group">
+                            <i data-lucide="search" class="search-icon"></i>
+                            <input type="text" id="busqueda-input" placeholder="Buscar por nombre, matrícula o correo..." autocomplete="off">
+                        </div>
+
+                        <div class="filters-group">
+                            <select id="filtro-carrera" class="select-filter">
+                                <option value="">Todas las Carreras</option>
+                                <option value="ISW">Ingeniería de Software</option>
+                                <option value="MED">Medicina Humana</option>
+                                <option value="DER">Derecho y C. Políticas</option>
+                            </select>
+
+                            <select id="filtro-semestre" class="select-filter">
+                                <option value="">Todos los Semestres</option>
+                                <option value="1">1º Semestre</option>
+                                <option value="2">2º Semestre</option>
+                                <option value="3">3º Semestre</option>
+                                <option value="4">4º Semestre</option>
+                                <option value="5">5º Semestre</option>
+                                <option value="6">6º Semestre</option>
+                                <option value="7">7º Semestre</option>
+                                <option value="8">8º Semestre</option>
+                            </select>
+
+                            <select id="filtro-estado" class="select-filter">
+                                <option value="">Todos los Estados</option>
+                                <option value="Activo">Activos</option>
+                                <option value="En Riesgo">En Riesgo (&lt; 3.5)</option>
+                                <option value="Egresado">Egresados</option>
+                            </select>
+
+                            <div class="view-toggle">
+                                <button id="btn-vista-grid" class="active" title="Vista Grid"><i data-lucide="grid"></i></button>
+                                <button id="btn-vista-tabla" title="Vista Tabla"><i data-lucide="list"></i></button>
+                            </div>
+
+                            <button id="btn-nuevo-estudiante" class="btn btn-primary">
+                                <i data-lucide="user-plus"></i> Nuevo Estudiante
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="estudiantes-contenedor" class="estudiantes-grid"></div>
+                </section>
+
+                <!-- VISTA 3: PENSUM Y FILTROS DE ASIGNATURAS -->
+                <section id="vista-pensum" class="vista-seccion">
+                    <div class="toolbar-box">
+                        <div class="search-group">
+                            <i data-lucide="search" class="search-icon"></i>
+                            <input type="text" id="busqueda-asg-input" placeholder="Buscar por asignatura, código o docente..." autocomplete="off">
+                        </div>
+
+                        <div class="filters-group">
+                            <select id="filtro-asg-carrera" class="select-filter">
+                                <option value="">Todas las Carreras</option>
+                                <option value="ISW">Ingeniería de Software</option>
+                                <option value="MED">Medicina Humana</option>
+                                <option value="DER">Derecho y C. Políticas</option>
+                            </select>
+
+                            <select id="filtro-asg-docente" class="select-filter">
+                                <option value="">Todos los Docentes</option>
+                                <!-- JS lo poblará dinámicamente -->
+                            </select>
+
+                            <select id="filtro-asg-nivel" class="select-filter">
+                                <option value="">Todos los Niveles</option>
+                                <option value="1">Nivel 1: Fundamentos (1º-2º Semestre)</option>
+                                <option value="2">Nivel 2: Intermedio (3º-5º Semestre)</option>
+                                <option value="3">Nivel 3: Avanzado (6º-8º Semestre)</option>
+                                <option value="4">Nivel 4: Especialización e Internado (9º-10º Semestre)</option>
+                            </select>
+
+                            <select id="filtro-asg-tipo" class="select-filter">
+                                <option value="">Todos los Tipos</option>
+                                <option value="exclusiva">Exclusivas (25 por Carrera)</option>
+                                <option value="compartida">Compartidas (15 Generales)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="asignaturas-contenedor" class="asignaturas-grid"></div>
+                </section>
+
+                <!-- VISTA 4: HORARIOS Y GRUPOS ACADÉMICOS (7:00 AM - 12:00 PM) -->
+                <section id="vista-horarios" class="vista-seccion">
+                    <div class="pensum-header-box">
+                        <div class="pensum-intro">
+                            <h2>Matriz Semanal de Horarios de Clases (7:00 AM - 12:00 PM)</h2>
+                            <p>Organización de asignaturas en bloques de 2 horas con asignación de aulas, grupos académicos y 20 docentes oficiales.</p>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-box">
+                        <div class="filters-group">
+                            <label style="font-weight:700; font-size:0.85rem;">Carrera:</label>
+                            <select id="filtro-horario-carrera" class="select-filter">
+                                <option value="">Todas las Carreras</option>
+                                <option value="ISW">Ingeniería de Software</option>
+                                <option value="MED">Medicina Humana</option>
+                                <option value="DER">Derecho y C. Políticas</option>
+                            </select>
+
+                            <label style="font-weight:700; font-size:0.85rem; margin-left:1rem;">Grupo:</label>
+                            <select id="filtro-horario-grupo" class="select-filter">
+                                <option value="">Todos los Grupos</option>
+                                <option value="G1">Grupo G1</option>
+                                <option value="G2">Grupo G2</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Tabla Matriz Horario Semanal (Lunes a Viernes) -->
+                    <div class="table-container">
+                        <table class="custom-table" id="tabla-matriz-horarios">
+                            <thead>
+                                <tr>
+                                    <th style="width:140px; text-align:center;">Bloque Horario</th>
+                                    <th style="width:18%;">Lunes</th>
+                                    <th style="width:18%;">Martes</th>
+                                    <th style="width:18%;">Miércoles</th>
+                                    <th style="width:18%;">Jueves</th>
+                                    <th style="width:18%;">Viernes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-matriz-horarios">
+                                <!-- Poblar vía JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- VISTA 5: GRUPOS ACADÉMICOS Y SECCIONES DE AULA (MÁX 15 ALUMNOS) -->
+                <section id="vista-grupos" class="vista-seccion">
+                    <div class="pensum-header-box">
+                        <div class="pensum-intro">
+                            <h2>Gestión de Grupos de Estudio y Capacidad de Aulas (Máx 15 Alumnos/Aula)</h2>
+                            <p>Organización estricta por Carrera, Semestres y Nivel Curricular. Ninguna sección supera los 15 estudiantes por aula.</p>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-box">
+                        <div class="filters-group">
+                            <label style="font-weight:700; font-size:0.85rem;">Carrera:</label>
+                            <select id="filtro-grupo-carrera" class="select-filter">
+                                <option value="">Todas las Carreras</option>
+                                <option value="ISW">Ingeniería de Software</option>
+                                <option value="MED">Medicina Humana</option>
+                                <option value="DER">Derecho y C. Políticas</option>
+                            </select>
+
+                            <label style="font-weight:700; font-size:0.85rem;">Nivel Curricular:</label>
+                            <select id="filtro-grupo-nivel" class="select-filter">
+                                <option value="">Todos los Niveles</option>
+                                <option value="1">Nivel 1: Fundamentos (1º-2º Semestre)</option>
+                                <option value="2">Nivel 2: Intermedio (3º-5º Semestre)</option>
+                                <option value="3">Nivel 3: Avanzado (6º-8º Semestre)</option>
+                            </select>
+                        </div>
+
+                        <div class="view-toggle">
+                            <button id="btn-grupo-grid" class="active" title="Vista Tarjetas Compactas"><i data-lucide="grid"></i></button>
+                            <button id="btn-grupo-tabla" title="Vista Lista Detallada"><i data-lucide="list"></i></button>
+                        </div>
+                    </div>
+
+                    <div id="grupos-contenedor" class="asignaturas-grid"></div>
+                </section>
+
+                <!-- VISTA 6: VISOR Y GESTOR DE BASE DE DATOS SQLITE (ACORDEÓN DESPLEGABLE) -->
+                <section id="vista-basedatos" class="vista-seccion">
+                    <div class="pensum-header-box">
+                        <div class="pensum-intro">
+                            <h2>Visor y Gestor Interactivo de Base de Datos (<code>universidad.db</code>)</h2>
+                            <p>Despliega cada tabla para consultar la totalidad de los registros, filtrar columnas en tiempo real o insertar nuevos datos.</p>
+                        </div>
+                    </div>
+
+                    <!-- Acordeón de Tablas de la Base de Datos -->
+                    <div id="db-accordion-container" class="db-accordion">
+                        <!-- JS generará las tablas desplegables para carreras, asignaturas, estudiantes e inscripciones -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL 1: FORMULARIO ESTUDIANTE -->
+    <div id="modal-estudiante" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-estudiante-titulo"><i data-lucide="user-plus"></i> Registrar Estudiante</h3>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <form id="form-estudiante">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="input-nombre">Nombre Completo *</label>
+                        <input type="text" id="input-nombre" required placeholder="Ej: Camila Rodríguez">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-carrera">Carrera Profesional *</label>
+                        <select id="input-carrera" required>
+                            <option value="ISW">Ingeniería de Software</option>
+                            <option value="MED">Medicina Humana</option>
+                            <option value="ADM">Administración de Empresas</option>
+                            <option value="DER">Derecho y C. Políticas</option>
+                            <option value="ARQ">Arquitectura y Urbanismo</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-semestre">Semestre Actual *</label>
+                        <select id="input-semestre" required>
+                            <option value="1">1º Semestre</option>
+                            <option value="2">2º Semestre</option>
+                            <option value="3">3º Semestre</option>
+                            <option value="4">4º Semestre</option>
+                            <option value="5">5º Semestre</option>
+                            <option value="6">6º Semestre</option>
+                            <option value="7">7º Semestre</option>
+                            <option value="8">8º Semestre</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-email">Correo Electrónico</label>
+                        <input type="email" id="input-email" placeholder="ejemplo@universidad.edu">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-telefono">Teléfono</label>
+                        <input type="text" id="input-telefono" placeholder="+52 55 1234-5678">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-estado">Estado Académico</label>
+                        <select id="input-estado">
+                            <option value="Activo">Activo</option>
+                            <option value="En Riesgo">En Riesgo (&lt; 3.5)</option>
+                            <option value="Egresado">Egresado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Estudiante</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: KARDEX ACADÉMICO -->
+    <div id="modal-kardex" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i data-lucide="file-text"></i> Kardex Académico del Estudiante</h3>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="kardex-perfil-header" class="kardex-profile-card"></div>
+
+                <!-- Sub-Navegación del Perfil del Estudiante -->
+                <div style="display:flex; gap:0.5rem; border-bottom:1px solid var(--border-color); margin-bottom:1rem; padding-bottom:0.4rem;">
+                    <button type="button" id="btn-tab-kardex" class="btn btn-primary" onclick="Controller.switchSubtabKardex('kardex')">
+                        <i data-lucide="file-text"></i> Kardex & Trámites
+                    </button>
+                    <button type="button" id="btn-tab-horario" class="btn btn-secondary" onclick="Controller.switchSubtabKardex('horario')">
+                        <i data-lucide="calendar"></i> Horario Semanal Individual
+                    </button>
+                </div>
+
+                <div id="subseccion-kardex">
+                    <div class="kardex-add-grade-box">
+                        <h4><i data-lucide="plus-circle"></i> Registrar / Modificar Calificación (0.0 - 5.0)</h4>
+                        <form id="form-registrar-nota" class="grade-inline-form">
+                            <select id="select-materia-nota" required>
+                                <option value="">Seleccionar Asignatura...</option>
+                            </select>
+                            <input type="number" id="input-valor-nota" min="0.0" max="5.0" step="0.1" required placeholder="Nota (0.0 - 5.0)">
+                            <button type="submit" class="btn btn-success"><i data-lucide="check"></i> Guardar Nota</button>
+                        </form>
+                    </div>
+
+                    <div class="kardex-add-grade-box" style="margin-top:1rem; background:#f0f9ff; border-color:#bae6fd;">
+                        <h4 style="color:#0369a1;"><i data-lucide="arrow-right-left"></i> Solicitar / Cambiar Grupo de Clase</h4>
+                        <form id="form-cambiar-grupo" class="grade-inline-form">
+                            <select id="select-materia-grupo" required>
+                                <option value="">Seleccionar Asignatura Inscrita...</option>
+                            </select>
+                            <select id="select-nuevo-grupo" required style="max-width:140px;">
+                                <option value="G1">Grupo G1</option>
+                                <option value="G2">Grupo G2</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary"><i data-lucide="refresh-cw"></i> Cambiar Grupo</button>
+                        </form>
+                        <p style="font-size:0.75rem; color:#0369a1; margin-top:0.4rem; display:flex; align-items:center; gap:4px;">
+                            <i data-lucide="alert-triangle" style="width:14px; height:14px; flex-shrink:0;"></i> <span><strong>Validación Automática:</strong> Se verificará no traslape de horario, aforo máx (10 exclusiva | 15 compartida) y restricción de nivel.</span>
+                        </p>
+                    </div>
+
+                    <div class="kardex-table-wrapper">
+                        <h4>Historial de Asignaturas Cursadas</h4>
+                        <table class="table-kardex">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Asignatura</th>
+                                    <th>Nivel</th>
+                                    <th>Créditos</th>
+                                    <th>Docente</th>
+                                    <th>Nota</th>
+                                    <th>Condición</th>
+                                </tr>
+                            </thead>
+                            <tbody id="kardex-tabla-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="subseccion-horario" style="display:none;">
+                    <h4 style="font-family:var(--font-heading); font-size:1rem; font-weight:700; margin-bottom:0.75rem;">
+                        <i data-lucide="calendar"></i> Matriz de Horario Semanal Individual del Estudiante
+                    </h4>
+                    <div class="table-container">
+                        <table class="custom-table" id="tabla-horario-individual">
+                            <thead>
+                                <tr>
+                                    <th style="width:140px; text-align:center;">Bloque Horario</th>
+                                    <th style="width:18%;">Lunes</th>
+                                    <th style="width:18%;">Martes</th>
+                                    <th style="width:18%;">Miércoles</th>
+                                    <th style="width:18%;">Jueves</th>
+                                    <th style="width:18%;">Viernes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-horario-individual"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PORTAL RECTORAL - INSERCIÓN INTUITIVA Y AMIGABLE DE REGISTROS -->
+    <div id="modal-insertar-db" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-insertar-titulo"><i data-lucide="shield-check"></i> Gestor Rectoral de Registros</h3>
+                    <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0.15rem;">Despacho de Rectoría • Inserción guiada de datos académicos y administrativos</p>
+                </div>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-insertar-db" class="grade-inline-form" style="flex-direction:column; align-items:stretch; gap:1rem;">
+                    <div id="insertar-db-campos" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;"></div>
+                    <div class="modal-footer" style="background:none; border-top:1px solid var(--border-color); padding-top:1rem;">
+                        <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary"><i data-lucide="plus-circle"></i> Insertar Registro</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: DETALLE Y NÓMINA DE ESTUDIANTES POR GRUPO -->
+    <div id="modal-nomina-grupo" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-nomina-titulo"><i data-lucide="users"></i> Nómina de Estudiantes Inscritos</h3>
+                    <p id="modal-nomina-sub" style="font-size:0.8rem; color:var(--text-muted);">Listado oficial de alumnos por grupo y aula</p>
+                </div>
+                <button class="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-container">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Avatar</th>
+                                <th>Matrícula</th>
+                                <th>Estudiante</th>
+                                <th>Carrera</th>
+                                <th>Semestre</th>
+                                <th>Promedio</th>
+                                <th>Nota Asg.</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-nomina-estudiantes"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
