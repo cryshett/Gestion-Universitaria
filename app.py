@@ -51,7 +51,9 @@ def asegurar_admin_mbsystem():
 
 asegurar_admin_mbsystem()
 
-# Inicialización de la aplicación Flask
+# =============================================================================
+# EXPORTACIÓN GLOBAL DE LA INSTANCIA 'app' DE FLASK PARA GUNICORN / WSGI
+# =============================================================================
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = settings.SECRET_KEY
 
