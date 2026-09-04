@@ -334,11 +334,45 @@ const Controller = {
             });
         });
 
-        // Formulario Crear Cuenta MB-System Admin con Datos Académicos Dinámicos
+        // Formulario Crear Cuenta MB-System Admin con Datos Académicos y Generación Automática
         const formCrearAuth = document.getElementById('form-crear-cuenta-admin');
         const selectRoleAuth = document.getElementById('auth-select-role');
         const camposEstudiante = document.getElementById('auth-campos-estudiante');
         const camposProfesor = document.getElementById('auth-campos-profesor');
+
+        const inpPrimerNombre = document.getElementById('auth-inp-primer-nombre');
+        const inpSegundoNombre = document.getElementById('auth-inp-segundo-nombre');
+        const inpPrimerApellido = document.getElementById('auth-inp-primer-apellido');
+        const inpSegundoApellido = document.getElementById('auth-inp-segundo-apellido');
+        const previewUser = document.getElementById('preview-username');
+        const previewMail = document.getElementById('preview-email');
+
+        const normalizarPreview = (str) => {
+            if (!str) return '';
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        };
+
+        const actualizarPreview = () => {
+            const pNom = normalizarPreview(inpPrimerNombre?.value.trim() || '');
+            const sNom = normalizarPreview(inpSegundoNombre?.value.trim() || '');
+            const pApe = normalizarPreview(inpPrimerApellido?.value.trim() || '');
+
+            if (!pNom || !pApe) {
+                if (previewUser) previewUser.innerText = '---';
+                if (previewMail) previewMail.innerText = '---@universidad.edu';
+                return;
+            }
+
+            const baseUser = `${pNom[0]}${sNom ? sNom[0] : ''}${pApe}`;
+            if (previewUser) previewUser.innerText = baseUser;
+            if (previewMail) previewMail.innerText = `${baseUser}@universidad.edu`;
+        };
+
+        [inpPrimerNombre, inpSegundoNombre, inpPrimerApellido].forEach(inp => {
+            if (inp) {
+                inp.addEventListener('input', actualizarPreview);
+            }
+        });
 
         if (selectRoleAuth) {
             selectRoleAuth.addEventListener('change', () => {
@@ -355,19 +389,21 @@ const Controller = {
                 const alertDiv = document.getElementById('alert-auth-crear');
                 if (alertDiv) alertDiv.style.display = 'none';
 
-                const nombre = document.getElementById('auth-inp-nombre').value.trim();
+                const primer_nombre = inpPrimerNombre?.value.trim() || '';
+                const segundo_nombre = inpSegundoNombre?.value.trim() || '';
+                const primer_apellido = inpPrimerApellido?.value.trim() || '';
+                const segundo_apellido = inpSegundoApellido?.value.trim() || '';
                 const identificacion = document.getElementById('auth-inp-documento').value.trim();
-                const username = document.getElementById('auth-inp-username').value.trim();
-                const email = document.getElementById('auth-inp-email').value.trim();
                 const password = document.getElementById('auth-inp-password').value.trim();
                 const role = document.getElementById('auth-select-role').value;
 
                 const payload = {
-                    nombre,
+                    primer_nombre,
+                    segundo_nombre,
+                    primer_apellido,
+                    segundo_apellido,
                     identificacion,
                     documento: identificacion,
-                    username,
-                    email,
                     password,
                     role
                 };
@@ -397,7 +433,10 @@ const Controller = {
                     UI.mostrarToast(res.mensaje, 'success');
                     formCrearAuth.reset();
 
-                    // Restablecer visibilidad según el rol por defecto (student)
+                    // Restablecer vista previa y visibilidad según rol default
+                    if (previewUser) previewUser.innerText = '---';
+                    if (previewMail) previewMail.innerText = '---@universidad.edu';
+
                     if (selectRoleAuth) selectRoleAuth.value = 'student';
                     if (camposEstudiante) camposEstudiante.style.display = 'grid';
                     if (camposProfesor) camposProfesor.style.display = 'none';

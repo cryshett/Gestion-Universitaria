@@ -476,26 +476,30 @@
                             <i data-lucide="user-plus" style="width:18px; height:18px; color:#2563eb;"></i> Crear Nueva Cuenta de Usuario
                         </h4>
                         <form id="form-crear-cuenta-admin">
-                            <!-- Bloque 1: Credenciales y Datos Comunes -->
+                            <!-- Bloque 1: Datos Personales Divididos y Credenciales Base -->
                             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1rem;">
                                 <div>
-                                    <label for="auth-inp-nombre" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Nombre Completo *</label>
-                                    <input type="text" id="auth-inp-nombre" placeholder="ej. Carlos Mendoza Ramos" required style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
+                                    <label for="auth-inp-primer-nombre" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Primer Nombre *</label>
+                                    <input type="text" id="auth-inp-primer-nombre" placeholder="ej. Juan" required style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
+                                </div>
+                                <div>
+                                    <label for="auth-inp-segundo-nombre" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Segundo Nombre (Opcional)</label>
+                                    <input type="text" id="auth-inp-segundo-nombre" placeholder="ej. Carlos" style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
+                                </div>
+                                <div>
+                                    <label for="auth-inp-primer-apellido" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Primer Apellido *</label>
+                                    <input type="text" id="auth-inp-primer-apellido" placeholder="ej. Pérez" required style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
+                                </div>
+                                <div>
+                                    <label for="auth-inp-segundo-apellido" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Segundo Apellido (Opcional)</label>
+                                    <input type="text" id="auth-inp-segundo-apellido" placeholder="ej. Gómez" style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
                                 </div>
                                 <div>
                                     <label for="auth-inp-documento" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Número de Identificación (Cédula/Doc) *</label>
                                     <input type="text" id="auth-inp-documento" placeholder="ej. 1098765432" required style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
                                 </div>
                                 <div>
-                                    <label for="auth-inp-username" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Nombre de Usuario *</label>
-                                    <input type="text" id="auth-inp-username" placeholder="ej. cmendoza" required style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
-                                </div>
-                                <div>
-                                    <label for="auth-inp-email" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Correo Electrónico *</label>
-                                    <input type="email" id="auth-inp-email" placeholder="ej. usuario@universidad.edu" required style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
-                                </div>
-                                <div>
-                                    <label for="auth-inp-password" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Contraseña Segura *</label>
+                                    <label for="auth-inp-password" style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem;">Contraseña Inicial *</label>
                                     <input type="password" id="auth-inp-password" placeholder="Mínimo 6 caracteres" required minlength="6" style="width:100%; padding:0.55rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
                                 </div>
                                 <div>
@@ -506,6 +510,29 @@
                                         <option value="admin">Administrador (Rectoría)</option>
                                         <option value="usuario">Usuario General</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <!-- Previsualización Automática de Credenciales Generadas -->
+                            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border:1px solid #e2e8f0; border-radius:6px; padding:0.85rem 1rem; margin-bottom:1rem; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+                                <div style="display:flex; align-items:center; gap:0.5rem;">
+                                    <div style="background:#e0e7ff; color:#4338ca; width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                        <i data-lucide="sparkles" style="width:18px; height:18px;"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Generación Automática</div>
+                                        <div style="font-size:0.85rem; font-weight:600; color:#1e293b;">Credenciales Institucionales</div>
+                                    </div>
+                                </div>
+                                <div style="display:flex; flex-wrap:wrap; gap:1.2rem; align-items:center;">
+                                    <div>
+                                        <span style="font-size:0.75rem; color:#64748b; display:block;">Usuario Generado:</span>
+                                        <code id="preview-username" style="font-size:0.88rem; font-weight:700; color:#2563eb; background:#eff6ff; padding:0.2rem 0.5rem; border-radius:4px;">---</code>
+                                    </div>
+                                    <div>
+                                        <span style="font-size:0.75rem; color:#64748b; display:block;">Correo Institucional:</span>
+                                        <code id="preview-email" style="font-size:0.88rem; font-weight:700; color:#16a34a; background:#f0fdf4; padding:0.2rem 0.5rem; border-radius:4px;">---@universidad.edu</code>
+                                    </div>
                                 </div>
                             </div>
 

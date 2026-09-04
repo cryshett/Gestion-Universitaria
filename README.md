@@ -113,7 +113,7 @@ Si no deseas ejecutar el servidor Flask, puedes abrir directamente el archivo [`
 | `POST` | `/api/notificaciones/<id>/leida` | Marca notificación como leída. | N/A |
 | `GET` | `/api/docentes/<id>/dashboard` | Panel docente con materias e inscritos. | N/A |
 | `GET` | `/api/admin/usuarios` | Admin: Lista usuarios registrados con perfil académico vinculado. | N/A |
-| `POST` | `/api/admin/crear-usuario` | Admin: Registra cuenta (mb_system.db) y ficha académica (universidad.db) de forma atómica. | `{"username": "...", "email": "...", "password": "...", "role": "...", "nombre": "...", "identificacion": "...", ...}` |
+| `POST` | `/api/admin/crear-usuario` | Admin: Registra cuenta con nombres divididos, auto-generación de usuario y correo, y persistencia atómica dual. | `{"primer_nombre": "...", "segundo_nombre": "...", "primer_apellido": "...", "segundo_apellido": "...", "identificacion": "...", "password": "...", "role": "..."}` |
 | `PUT` | `/api/admin/usuarios/<id>` | Admin: Modifica email, rol, estado activo o contraseña del usuario. | `{"email": "...", "role": "...", "is_active": true, ...}` |
 | `DELETE` | `/api/admin/usuarios/<id>` | Admin: Elimina usuario y sus registros académicos vinculados. | N/A |
 | `GET` | `/api/admin/login-history` | Admin: Retorna registro de auditoría de inicios de sesión y bloqueos. | N/A |

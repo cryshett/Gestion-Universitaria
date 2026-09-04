@@ -49,6 +49,10 @@ classDiagram
     class Profesor {
         +String id
         +String documento
+        +String primer_nombre
+        +String segundo_nombre
+        +String primer_apellido
+        +String segundo_apellido
         +String nombre
         +String email
         +String telefono
@@ -67,6 +71,10 @@ classDiagram
         +String id
         +String matricula
         +String documento
+        +String primer_nombre
+        +String segundo_nombre
+        +String primer_apellido
+        +String segundo_apellido
         +String nombre
         +String email
         +String telefono
@@ -338,9 +346,9 @@ sequenceDiagram
 
 ---
 
-## 5. Diagrama de Secuencia: Registro Académico y Transacción Atómica (MB-System)
+## 5. Diagrama de Secuencia: Registro con Nombres Divididos y Auto-Generación de Credenciales
 
-Ilustra la sincronización bidireccional y control transaccional atómico al registrar un nuevo usuario con perfil académico desde el panel de Rectoría:
+Ilustra la sincronización bidireccional y control transaccional atómico al registrar un nuevo usuario con nombres divididos, generación algorítmica de username/email institucional y vinculación académica:
 
 ```mermaid
 sequenceDiagram
@@ -351,34 +359,38 @@ sequenceDiagram
     participant MBS as BD Auth (mb_system.db)
     participant UNI as BD Académica (universidad.db)
 
-    A->>UI: Ingresa datos comunes (Nombre, Cédula, Usuario, Email, Clave) y datos de rol (Carrera, Semestre, Grupo)
-    UI->>C: POST /api/admin/crear-usuario {username, email, role, nombre, identificacion, carrera_id, ...}
+    A->>UI: Ingresa Primer Nombre, Segundo Nombre, Primer Apellido, Segundo Apellido, Cédula y Contraseña
+    UI->>UI: Previsualiza en tiempo real username (ej. jcperez) y correo (@universidad.edu)
+    A->>UI: Selecciona Rol y completa datos académicos (Carrera, Semestre, Grupo)
+    UI->>C: POST /api/admin/crear-usuario {primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, identificacion, ...}
     activate C
 
-    C->>MBS: Validar unicidad de username y email
-    alt Usuario o Email Duplicado
-        C-->>UI: 400 Bad Request: "El usuario o correo ya está registrado"
-    else Datos de Usuario Válidos
-        C->>UNI: SELECT id FROM estudiantes/profesores WHERE documento = ?
-        alt Documento / Cédula Duplicada
-            UNI-->>C: Registro existente
-            C-->>UI: 400 Bad Request: "El número de identificación ya está asignado"
-        else Identificación Única
-            C->>MBS: db_sqla.add(User) + db_sqla.flush()
-            MBS-->>C: ID de Usuario asignado (sin commit)
+    C->>C: generar_username_institucional() [1ª letra p_nom + 1ª letra s_nom + p_ape]
+    C->>MBS: Validar colisión de username en tabla users
+    alt Username en uso (Colisión)
+        C->>C: Añadir sufijo numérico incremental (jcperez1, jcperez2, ...)
+    end
+    C->>C: generar_email_institucional(username) -> username@universidad.edu
 
-            alt Inserción en universidad.db exitosa
-                C->>UNI: INSERT INTO estudiantes / profesores (datos académicos, user_id, username)
-                UNI-->>C: Confirmación de inserción SQLite OK
-                C->>MBS: db_sqla.commit() (Confirmación definitiva)
-                C-->>UI: 201 Created: "Usuario registrado con datos académicos"
-                UI-->>A: Muestra toast verde y refresca tabla de cuentas
-            else Error en universidad.db (Rollback Atómico)
-                UNI-->>C: Error de integridad o aforo
-                C->>MBS: db_sqla.rollback() (Reversión total de credenciales)
-                C-->>UI: 400 Bad Request: "Error al registrar datos académicos"
-                UI-->>A: Muestra toast rojo con motivo exacto
-            end
+    C->>UNI: SELECT id FROM estudiantes/profesores WHERE documento = ?
+    alt Documento / Cédula Duplicada
+        UNI-->>C: Registro existente
+        C-->>UI: 400 Bad Request: "El número de identificación ya está asignado"
+    else Identificación Única
+        C->>MBS: db_sqla.add(User) + db_sqla.flush()
+        MBS-->>C: ID de Usuario asignado (sin commit)
+
+        alt Inserción en universidad.db exitosa
+            C->>UNI: INSERT INTO estudiantes / profesores (primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, nombre_concatenado, email, user_id, username, ...)
+            UNI-->>C: Confirmación de inserción SQLite OK
+            C->>MBS: db_sqla.commit() (Confirmación definitiva)
+            C-->>UI: 201 Created: "Usuario registrado con credenciales automáticas"
+            UI-->>A: Muestra toast verde y refresca tabla de cuentas
+        else Error en universidad.db (Rollback Atómico)
+            UNI-->>C: Error de integridad o aforo
+            C->>MBS: db_sqla.rollback() (Reversión total de credenciales)
+            C-->>UI: 400 Bad Request: "Error al registrar datos académicos"
+            UI-->>A: Muestra toast rojo con motivo exacto
         end
     end
     deactivate C

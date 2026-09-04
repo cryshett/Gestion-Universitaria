@@ -14,6 +14,8 @@ from flask import Flask, render_template, jsonify, request, g, Response, session
 import sqlite3
 import os
 import uuid
+import unicodedata
+import re
 from datetime import datetime, timedelta
 from typing import Tuple, Dict, Any, List
 
@@ -50,6 +52,10 @@ def init_universidad_db():
             id VARCHAR(20) PRIMARY KEY,
             documento VARCHAR(20) UNIQUE NOT NULL,
             nombre VARCHAR(100) NOT NULL,
+            primer_nombre VARCHAR(50) DEFAULT '',
+            segundo_nombre VARCHAR(50) DEFAULT '',
+            primer_apellido VARCHAR(50) DEFAULT '',
+            segundo_apellido VARCHAR(50) DEFAULT '',
             email VARCHAR(100) UNIQUE NOT NULL,
             telefono VARCHAR(30) DEFAULT '+52 55 5555-0000',
             titulo_academico VARCHAR(100) DEFAULT 'Docente Titular',
@@ -79,6 +85,10 @@ def init_universidad_db():
             matricula VARCHAR(30) UNIQUE NOT NULL,
             documento VARCHAR(20) UNIQUE,
             nombre VARCHAR(100) NOT NULL,
+            primer_nombre VARCHAR(50) DEFAULT '',
+            segundo_nombre VARCHAR(50) DEFAULT '',
+            primer_apellido VARCHAR(50) DEFAULT '',
+            segundo_apellido VARCHAR(50) DEFAULT '',
             email VARCHAR(100) NOT NULL,
             telefono VARCHAR(30) DEFAULT '+52 55 5555-5555',
             carrera_id VARCHAR(10) NOT NULL,
@@ -135,9 +145,17 @@ def init_universidad_db():
     agregar_columna_si_falta("estudiantes", "grupo", "VARCHAR(10) DEFAULT 'G1'")
     agregar_columna_si_falta("estudiantes", "username", "VARCHAR(50) DEFAULT ''")
     agregar_columna_si_falta("estudiantes", "user_id", "INT DEFAULT NULL")
+    agregar_columna_si_falta("estudiantes", "primer_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "segundo_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "primer_apellido", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "segundo_apellido", "VARCHAR(50) DEFAULT ''")
 
     agregar_columna_si_falta("profesores", "username", "VARCHAR(50) DEFAULT ''")
     agregar_columna_si_falta("profesores", "user_id", "INT DEFAULT NULL")
+    agregar_columna_si_falta("profesores", "primer_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "segundo_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "primer_apellido", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "segundo_apellido", "VARCHAR(50) DEFAULT ''")
 
     # Poblar carreras institucionales si la tabla está vacía
     cursor.execute("SELECT COUNT(*) FROM carreras;")
@@ -1539,57 +1557,136 @@ def admin_listar_usuarios() -> Tuple[Response, int]:
     return respuesta_exito(resultado)
 
 
+def normalizar_cadena(texto: str) -> str:
+    """Remueve acentos, tildes y caracteres especiales dejando sólo alfanuméricos en minúsculas."""
+    if not texto:
+        return ""
+    nfkd = unicodedata.normalize('NFKD', str(texto))
+    ascii_str = nfkd.encode('ASCII', 'ignore').decode('utf-8')
+    return re.sub(r'[^a-zA-Z0-9]', '', ascii_str).lower()
+
+
+def generar_username_institucional(db_sqla, primer_nombre: str, segundo_nombre: str, primer_apellido: str) -> str:
+    """
+    Genera el username único según la regla:
+    Primera letra del primer nombre + primera letra del segundo nombre (si existe) + primer apellido completo.
+    En minúsculas, sin espacios ni caracteres especiales/acentos.
+    Si ya existe en la tabla 'users', añade un número secuencial (ej. 'jcperez1', 'jcperez2').
+    """
+    p_nom = normalizar_cadena(primer_nombre)
+    s_nom = normalizar_cadena(segundo_nombre)
+    p_ape = normalizar_cadena(primer_apellido)
+
+    primera_p = p_nom[0] if p_nom else "u"
+    primera_s = s_nom[0] if s_nom else ""
+
+    base = f"{primera_p}{primera_s}{p_ape}"
+    if not base:
+        base = "usuario"
+
+    candidate = base
+    counter = 1
+    while db_sqla.query(User).filter(User.username.ilike(candidate)).first():
+        candidate = f"{base}{counter}"
+        counter += 1
+
+    return candidate
+
+
+def generar_email_institucional(username: str) -> str:
+    """Genera el correo institucional a partir del username institucional."""
+    return f"{username}@universidad.edu"
+
+
 @app.route("/api/admin/crear-usuario", methods=["POST"])
 def admin_crear_usuario() -> Tuple[Response, int]:
     """
     Permite al Administrador registrar dinámicamente nuevas cuentas de cualquier rol
-    con persistencia atómica en mb_system.db (users) y en universidad.db (estudiantes / profesores).
+    con división de nombres y generación automática de username y correo institucional.
+    Persistencia atómica bidireccional en mb_system.db (users) y en universidad.db (estudiantes / profesores).
     """
     datos = obtener_datos_peticion()
-    username = datos.get("username", "").strip()
-    email = datos.get("email", "").strip().lower()
+    
+    primer_nombre = (datos.get("primer_nombre") or "").strip()
+    segundo_nombre = (datos.get("segundo_nombre") or "").strip()
+    primer_apellido = (datos.get("primer_apellido") or "").strip()
+    segundo_apellido = (datos.get("segundo_apellido") or "").strip()
+    identificacion = (datos.get("identificacion") or datos.get("documento") or "").strip()
     password = datos.get("password", "").strip()
     role_str = datos.get("role", "usuario").strip().lower()
 
-    nombre = (datos.get("nombre") or "").strip()
-    identificacion = (datos.get("identificacion") or datos.get("documento") or "").strip()
+    # Retrocompatibilidad si se envió un único campo "nombre"
+    nombre_completo = (datos.get("nombre") or "").strip()
+    if not primer_nombre and nombre_completo:
+        partes = nombre_completo.split()
+        if len(partes) == 1:
+            primer_nombre = partes[0]
+            primer_apellido = partes[0]
+        elif len(partes) == 2:
+            primer_nombre = partes[0]
+            primer_apellido = partes[1]
+        elif len(partes) == 3:
+            primer_nombre = partes[0]
+            primer_apellido = partes[1]
+            segundo_apellido = partes[2]
+        else:
+            primer_nombre = partes[0]
+            segundo_nombre = partes[1]
+            primer_apellido = partes[2]
+            segundo_apellido = " ".join(partes[3:])
 
-    if not username or not email or not password:
-        return respuesta_error("Nombre de usuario, email y contraseña son obligatorios.", 400)
+    if not primer_nombre or not primer_apellido:
+        return respuesta_error("El primer nombre y el primer apellido son obligatorios.", 400)
+
+    if not identificacion:
+        return respuesta_error("El número de identificación (cédula/documento) es obligatorio.", 400)
+
+    if not password:
+        return respuesta_error("La contraseña es obligatoria.", 400)
 
     if len(password) < 6:
         return respuesta_error("La contraseña debe tener al menos 6 caracteres.", 400)
 
-    # Si es Estudiante o Docente, nombre e identificación son obligatorios
-    if role_str in ("student", "teacher", "docente", "estudiante"):
-        if not nombre or not identificacion:
-            return respuesta_error("El nombre completo y el número de identificación (cédula/documento) son obligatorios para este rol.", 400)
-    else:
-        if not nombre:
-            nombre = username
+    # Construir nombre completo formal concatenado
+    partes_nom = [primer_nombre]
+    if segundo_nombre:
+        partes_nom.append(segundo_nombre)
+    partes_nom.append(primer_apellido)
+    if segundo_apellido:
+        partes_nom.append(segundo_apellido)
+    nombre = " ".join(partes_nom)
 
     db_sqla = get_sqlalchemy_db()
     db_sqlite = get_db()
     cursor = db_sqlite.cursor()
 
-    # 1. Validar que username o email no existan en mb_system.db
+    # 1. Generación automática de Username (o manual si se especifica explícitamente)
+    username = datos.get("username", "").strip()
+    if not username:
+        username = generar_username_institucional(db_sqla, primer_nombre, segundo_nombre, primer_apellido)
+
+    # 2. Generación automática de Email institucional
+    email = datos.get("email", "").strip().lower()
+    if not email:
+        email = generar_email_institucional(username)
+
+    # 3. Validar que username o email no existan en mb_system.db
     existente_sqla = db_sqla.query(User).filter(
         (User.username.ilike(username)) | (User.email.ilike(email))
     ).first()
     if existente_sqla:
-        return respuesta_error("El nombre de usuario o el correo electrónico ya se encuentran registrados.", 400)
+        return respuesta_error(f"El usuario '{username}' o correo '{email}' ya se encuentran registrados.", 400)
 
-    # 2. Validar que el número de identificación sea único antes de procesar el guardado
-    if identificacion:
-        cursor.execute("SELECT id, nombre FROM estudiantes WHERE documento = ? OR matricula = ?;", (identificacion, identificacion))
-        est_dup = cursor.fetchone()
-        if est_dup:
-            return respuesta_error(f"El número de identificación '{identificacion}' ya está asignado al estudiante '{est_dup['nombre']}'.", 400)
+    # 4. Validar que el número de identificación sea único antes de procesar el guardado
+    cursor.execute("SELECT id, nombre FROM estudiantes WHERE documento = ? OR matricula = ?;", (identificacion, identificacion))
+    est_dup = cursor.fetchone()
+    if est_dup:
+        return respuesta_error(f"El número de identificación '{identificacion}' ya está asignado al estudiante '{est_dup['nombre']}'.", 400)
 
-        cursor.execute("SELECT id, nombre FROM profesores WHERE documento = ?;", (identificacion,))
-        prof_dup = cursor.fetchone()
-        if prof_dup:
-            return respuesta_error(f"El número de identificación '{identificacion}' ya está asignado al docente '{prof_dup['nombre']}'.", 400)
+    cursor.execute("SELECT id, nombre FROM profesores WHERE documento = ?;", (identificacion,))
+    prof_dup = cursor.fetchone()
+    if prof_dup:
+        return respuesta_error(f"El número de identificación '{identificacion}' ya está asignado al docente '{prof_dup['nombre']}'.", 400)
 
     try:
         rol_enum = RoleEnum(role_str)
@@ -1618,7 +1715,7 @@ def admin_crear_usuario() -> Tuple[Response, int]:
         carrera_prof = (datos.get("carrera_principal") or datos.get("carrera") or datos.get("departamento") or "ISW").strip().upper()
         titulo_academico = (datos.get("titulo_academico") or "Docente Titular").strip()
 
-    # 3. TRANSACCIÓN ATÓMICA CON ROLLBACK BIDIRECCIONAL
+    # 5. TRANSACCIÓN ATÓMICA CON ROLLBACK BIDIRECCIONAL
     nuevo_usuario = User(
         username=username,
         email=email,
@@ -1647,12 +1744,14 @@ def admin_crear_usuario() -> Tuple[Response, int]:
                 cursor.execute("""
                     INSERT INTO estudiantes (
                         id, matricula, documento, nombre, email, telefono, carrera_id,
-                        semestre, grupo, estado, estado_pago, promedio, foto_avatar, username, user_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        semestre, grupo, estado, estado_pago, promedio, foto_avatar, username, user_id,
+                        primer_nombre, segundo_nombre, primer_apellido, segundo_apellido
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """, (
                     nuevo_est_id, matricula, identificacion, nombre, email,
                     telefono, carrera_id, semestre, grupo, 'Activo', 'Al día',
-                    0.0, avatar, username, nuevo_usuario.id
+                    0.0, avatar, username, nuevo_usuario.id,
+                    primer_nombre, segundo_nombre, primer_apellido, segundo_apellido
                 ))
 
             elif rol_enum == RoleEnum.teacher:
@@ -1666,11 +1765,13 @@ def admin_crear_usuario() -> Tuple[Response, int]:
                 cursor.execute("""
                     INSERT INTO profesores (
                         id, documento, nombre, email, telefono, titulo_academico,
-                        carrera_principal, estado, username, user_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        carrera_principal, estado, username, user_id,
+                        primer_nombre, segundo_nombre, primer_apellido, segundo_apellido
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """, (
                     nuevo_prof_id, identificacion, nombre, email, telefono,
-                    titulo_academico, carrera_prof, 'Activo', username, nuevo_usuario.id
+                    titulo_academico, carrera_prof, 'Activo', username, nuevo_usuario.id,
+                    primer_nombre, segundo_nombre, primer_apellido, segundo_apellido
                 ))
 
         # Si la inserción en SQLite concluyó sin errores, confirmamos en SQLAlchemy
@@ -1683,13 +1784,17 @@ def admin_crear_usuario() -> Tuple[Response, int]:
         return respuesta_error(f"Error atómico al registrar datos académicos: {str(e)}", 400)
 
     return respuesta_exito({
-        "mensaje": f"Usuario '{username}' ({rol_enum.value}) registrado exitosamente con sus datos académicos vinculados.",
+        "mensaje": f"Usuario '{username}' ({rol_enum.value}) registrado exitosamente con credenciales automáticas y ficha académica vinculada.",
         "usuario": {
             "id": nuevo_usuario.id,
             "username": nuevo_usuario.username,
             "email": nuevo_usuario.email,
             "role": nuevo_usuario.role.value,
             "nombre": nombre,
+            "primer_nombre": primer_nombre,
+            "segundo_nombre": segundo_nombre,
+            "primer_apellido": primer_apellido,
+            "segundo_apellido": segundo_apellido,
             "identificacion": identificacion
         }
     }, 201)

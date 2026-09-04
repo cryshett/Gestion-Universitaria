@@ -9,6 +9,7 @@ Prueba automatizada de verificación de la depuración de base de datos y autent
 """
 import os
 import sys
+import sqlite3
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -27,6 +28,12 @@ def run_tests():
     print("--- 1. Recreando esquema de BD y sembrando EXCLUSIVAMENTE admin de MBSystem ---")
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+
+    # Limpiar registros previos de prueba en universidad.db
+    conn_sq = sqlite3.connect("universidad.db")
+    with conn_sq:
+        conn_sq.execute("DELETE FROM profesores WHERE documento = '1122334455' OR username = 'docente_nuevo';")
+    conn_sq.close()
 
     db = SessionLocal()
     admin = User(

@@ -2,6 +2,21 @@
 
 Todas las modificaciones notables del proyecto **UniGestion PRO** están documentadas en este archivo estructurado bajo el estándar de [Semantic Versioning (SemVer)](https://semver.org/lang/es/).
 
+## ⚡ [v2.3.0] - 2026-09-04 (Nombres Divididos y Generación Automática de Credenciales)
+### Añadido
+- **Estructura de Nombres Divididos**:
+  - Captura segmentada de `primer_nombre` (obligatorio), `segundo_nombre` (opcional), `primer_apellido` (obligatorio) y `segundo_apellido` (opcional) en el formulario de creación de cuentas del panel de administración (`admin.html`).
+  - Previsualización dinámica en tiempo real del `username` institucional y correo electrónico (`@universidad.edu`) conforme el usuario escribe sus nombres.
+- **Algoritmo de Generación Automática de Credenciales**:
+  - `generar_username_institucional`: Regla algorítmica de 1ª letra de primer nombre + 1ª letra de segundo nombre (si existe) + primer apellido completo normalizado (en minúsculas, sin acentos, tildes ni caracteres especiales).
+  - Manejo secuencial automático de colisiones: añade sufijo numérico incremental (`jcperez1`, `jcperez2`, ...) si el username base ya existe en `users`.
+  - `generar_email_institucional`: Generación directa con dominio `[username]@universidad.edu`.
+- **Evolución del Esquema y Persistencia Atómica**:
+  - Incorporación de columnas `primer_nombre`, `segundo_nombre`, `primer_apellido` y `segundo_apellido` en las tablas `estudiantes` y `profesores` de `universidad.db`, manteniendo la columna `nombre` calculada para compatibilidad total con vistas y módulos existentes.
+  - Validación de unicidad de identificación y reversión transaccional completa (rollback en SQLAlchemy) si ocurre algún error durante la persistencia en SQLite.
+- **Pruebas Automatizadas de Verificación**:
+  - Suite de integración [scratch/test_academic_user_creation.py](file:///c:/Users/crist/.gemini/antigravity-ide/scratch/modulo-universitario-gestion/scratch/test_academic_user_creation.py) con cobertura de nombres divididos, resolución de colisiones, manejo de acentos y rollback atómico.
+
 ---
 
 ## 🛡️ [v2.2.0] - 2026-09-04 (Autenticación MB-System y Registro Académico Atómico)
