@@ -29,6 +29,131 @@ from app.core.config import settings
 # Creación/Metadatos de tablas mb-system
 Base.metadata.create_all(bind=engine)
 
+def init_universidad_db():
+    """Inicializa y asegura la estructura completa de tablas en universidad.db (SQLite)."""
+    conn = sqlite3.connect("universidad.db")
+    cursor = conn.cursor()
+    cursor.executescript("""
+        CREATE TABLE IF NOT EXISTS carreras (
+            id VARCHAR(10) PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            codigo VARCHAR(20) UNIQUE NOT NULL,
+            duracion_semestres INT NOT NULL,
+            total_creditos INT NOT NULL,
+            cupos_maximos INT NOT NULL DEFAULT 30,
+            color VARCHAR(20) NOT NULL,
+            descripcion TEXT NOT NULL,
+            icono VARCHAR(50) NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS profesores (
+            id VARCHAR(20) PRIMARY KEY,
+            documento VARCHAR(20) UNIQUE NOT NULL,
+            nombre VARCHAR(100) NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            telefono VARCHAR(30) DEFAULT '+52 55 5555-0000',
+            titulo_academico VARCHAR(100) DEFAULT 'Docente Titular',
+            carrera_principal VARCHAR(10) NOT NULL,
+            estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+            username VARCHAR(50) DEFAULT '',
+            user_id INT DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS asignaturas (
+            id VARCHAR(20) PRIMARY KEY,
+            codigo VARCHAR(20) UNIQUE NOT NULL,
+            nombre VARCHAR(150) NOT NULL,
+            creditos INT NOT NULL,
+            nivel INT NOT NULL CHECK (nivel IN (1, 2, 3)),
+            tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('exclusiva', 'compartida')),
+            carrera_id VARCHAR(10) DEFAULT NULL,
+            carreras_compartidas VARCHAR(100) DEFAULT NULL,
+            docente VARCHAR(100) NOT NULL,
+            horario VARCHAR(50) NOT NULL,
+            grupo VARCHAR(10) NOT NULL DEFAULT 'G1',
+            aula VARCHAR(50) NOT NULL DEFAULT 'Aula 101'
+        );
+
+        CREATE TABLE IF NOT EXISTS estudiantes (
+            id VARCHAR(20) PRIMARY KEY,
+            matricula VARCHAR(30) UNIQUE NOT NULL,
+            documento VARCHAR(20) UNIQUE,
+            nombre VARCHAR(100) NOT NULL,
+            email VARCHAR(100) NOT NULL,
+            telefono VARCHAR(30) DEFAULT '+52 55 5555-5555',
+            carrera_id VARCHAR(10) NOT NULL,
+            semestre INT NOT NULL CHECK (semestre BETWEEN 1 AND 10),
+            grupo VARCHAR(10) NOT NULL DEFAULT 'G1',
+            estado VARCHAR(20) NOT NULL CHECK (estado IN ('Activo', 'En Riesgo', 'Egresado', 'Suspendido')) DEFAULT 'Activo',
+            estado_pago VARCHAR(20) NOT NULL DEFAULT 'Al día' CHECK (estado_pago IN ('Al día', 'Pendiente', 'Bloqueado')),
+            promedio DOUBLE NOT NULL DEFAULT 0.0,
+            foto_avatar VARCHAR(255) NOT NULL,
+            username VARCHAR(50) DEFAULT '',
+            user_id INT DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS inscripciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante_id VARCHAR(20) NOT NULL,
+            asignatura_id VARCHAR(20) NOT NULL,
+            nota DOUBLE NOT NULL CHECK (nota BETWEEN 0.0 AND 5.0),
+            periodo VARCHAR(20) NOT NULL DEFAULT '2026-1',
+            UNIQUE (estudiante_id, asignatura_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS notificaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante_id VARCHAR(20) NOT NULL,
+            titulo VARCHAR(150) NOT NULL,
+            mensaje TEXT NOT NULL,
+            tipo VARCHAR(20) NOT NULL DEFAULT 'pago' CHECK (tipo IN ('pago', 'academico', 'sistema')),
+            fecha VARCHAR(30) NOT NULL,
+            leido TINYINT(1) NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS solicitudes_cambio_grupo (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante_id VARCHAR(20) NOT NULL,
+            asignatura_id VARCHAR(20) NOT NULL,
+            grupo_actual VARCHAR(10) NOT NULL,
+            grupo_solicitado VARCHAR(10) NOT NULL,
+            motivo TEXT NOT NULL,
+            estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+            fecha VARCHAR(30) NOT NULL,
+            fecha_resolucion VARCHAR(30) DEFAULT NULL,
+            respuesta_admin TEXT DEFAULT NULL
+        );
+    """)
+
+    # Asegurar columnas necesarias en caso de tablas preexistentes
+    def agregar_columna_si_falta(tabla, columna, definicion):
+        cols = [c[1] for c in cursor.execute(f"PRAGMA table_info({tabla});").fetchall()]
+        if columna not in cols:
+            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion};")
+
+    agregar_columna_si_falta("estudiantes", "documento", "VARCHAR(20) UNIQUE")
+    agregar_columna_si_falta("estudiantes", "grupo", "VARCHAR(10) DEFAULT 'G1'")
+    agregar_columna_si_falta("estudiantes", "username", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "user_id", "INT DEFAULT NULL")
+
+    agregar_columna_si_falta("profesores", "username", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "user_id", "INT DEFAULT NULL")
+
+    # Poblar carreras institucionales si la tabla está vacía
+    cursor.execute("SELECT COUNT(*) FROM carreras;")
+    if cursor.fetchone()[0] == 0:
+        carreras_base = [
+            ("ISW", "Ingeniería de Software", "ISW", 8, 160, 30, "#3b82f6", "Formación integral en desarrollo y arquitectura de software.", "code"),
+            ("MED", "Medicina Humana", "MED", 10, 220, 30, "#10b981", "Excelencia médica, ciencias biológicas y salud comunitaria.", "stethoscope"),
+            ("DER", "Derecho y Ciencias Políticas", "DER", 8, 150, 30, "#8b5cf6", "Ciencias jurídicas, derecho civil, penal y corporativo.", "scale")
+        ]
+        cursor.executemany("INSERT INTO carreras VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", carreras_base)
+
+    conn.commit()
+    conn.close()
+
+init_universidad_db()
+
 def asegurar_admin_mbsystem():
     """Garantiza la existencia del usuario Administrador exclusivo de MBSystem (admin / admin@mbsystem.com)."""
     db = SessionLocal()
@@ -339,26 +464,81 @@ def api_login() -> Tuple[Response, int]:
 
 @app.route("/api/me", methods=["GET"])
 def api_me() -> Tuple[Response, int]:
-    """Retorna el perfil del usuario autenticado en la sesión actual."""
+    """Retorna el perfil del usuario autenticado en la sesión actual con sus datos académicos vinculados."""
     role = session.get("role")
     user_id = session.get("user_id")
 
     if not role or not user_id:
         return respuesta_error("No hay una sesión activa.", 401)
 
-    db = get_sqlalchemy_db()
-    user = db.get(User, user_id)
+    db_sqla = get_sqlalchemy_db()
+    user = db_sqla.get(User, user_id)
     if user:
-        return respuesta_exito({
+        role_exact = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        app_role = session.get("role", role_exact.lower())
+
+        resp_data = {
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "role": session.get("role"),
-            "role_exact": user.role.value if hasattr(user.role, 'value') else str(user.role),
+            "role": app_role,
+            "role_exact": role_exact,
             "user_id": user.id,
             "user_name": user.username,
+            "nombre": user.username,
             "created_at": user.created_at.isoformat() if user.created_at else None
-        })
+        }
+
+        # Correlacionar con universidad.db para enriquecer datos académicos
+        db_sqlite = get_db()
+        cursor = db_sqlite.cursor()
+
+        if app_role in ("student", "estudiante"):
+            cursor.execute("""
+                SELECT e.*, c.nombre as carrera_nombre 
+                FROM estudiantes e 
+                LEFT JOIN carreras c ON e.carrera_id = c.id
+                WHERE e.user_id = ? OR e.username = ? OR e.email = ?;
+            """, (user.id, user.username, user.email))
+            est = cursor.fetchone()
+            if est:
+                resp_data.update({
+                    "id": est["id"],  # Código académico ej: EST-001
+                    "estudiante_id": est["id"],
+                    "nombre": est["nombre"],
+                    "documento": est["documento"] or "",
+                    "matricula": est["matricula"],
+                    "carrera_id": est["carrera_id"],
+                    "carrera_nombre": est["carrera_nombre"] or est["carrera_id"],
+                    "semestre": est["semestre"],
+                    "grupo": est["grupo"] or "G1",
+                    "promedio": float(est["promedio"] or 0.0),
+                    "estado": est["estado"],
+                    "estado_pago": est["estado_pago"],
+                    "foto_avatar": est["foto_avatar"]
+                })
+        elif app_role in ("teacher", "docente"):
+            cursor.execute("""
+                SELECT p.*, c.nombre as carrera_nombre 
+                FROM profesores p
+                LEFT JOIN carreras c ON p.carrera_principal = c.id
+                WHERE p.user_id = ? OR p.username = ? OR p.email = ?;
+            """, (user.id, user.username, user.email))
+            doc = cursor.fetchone()
+            if doc:
+                resp_data.update({
+                    "id": doc["id"],  # Código académico ej: DOC-001
+                    "docente_id": doc["id"],
+                    "nombre": doc["nombre"],
+                    "documento": doc["documento"],
+                    "carrera_principal": doc["carrera_principal"],
+                    "carrera_nombre": doc["carrera_nombre"] or doc["carrera_principal"],
+                    "titulo_academico": doc["titulo_academico"],
+                    "telefono": doc["telefono"],
+                    "estado": doc["estado"]
+                })
+
+        return respuesta_exito(resp_data)
 
     # Si no está en SQLAlchemy pero hay sesión de admin
     if role == "admin":
@@ -1290,33 +1470,89 @@ def insertar_registro_bd() -> Tuple[Response, int]:
 
 @app.route("/api/admin/usuarios", methods=["GET"])
 def admin_listar_usuarios() -> Tuple[Response, int]:
-    """Lista todos los usuarios registrados en el sistema (exclusivo Admin)."""
-    db = get_sqlalchemy_db()
-    users = db.query(User).order_by(User.id).all()
-    resultado = [
-        {
+    """Lista todos los usuarios registrados en el sistema correlacionados con su perfil académico."""
+    db_sqla = get_sqlalchemy_db()
+    users = db_sqla.query(User).order_by(User.id).all()
+
+    db_sqlite = get_db()
+    cursor = db_sqlite.cursor()
+
+    # Mapeo de estudiantes
+    cursor.execute("SELECT id, matricula, documento, nombre, email, carrera_id, semestre, grupo, username, user_id FROM estudiantes;")
+    estudiantes_por_user = {}
+    for est in cursor.fetchall():
+        d = dict(est)
+        if d.get("user_id"):
+            estudiantes_por_user[d["user_id"]] = d
+        if d.get("username"):
+            estudiantes_por_user[d["username"].lower()] = d
+
+    # Mapeo de profesores
+    cursor.execute("SELECT id, documento, nombre, email, carrera_principal, titulo_academico, username, user_id FROM profesores;")
+    profesores_por_user = {}
+    for prof in cursor.fetchall():
+        d = dict(prof)
+        if d.get("user_id"):
+            profesores_por_user[d["user_id"]] = d
+        if d.get("username"):
+            profesores_por_user[d["username"].lower()] = d
+
+    resultado = []
+    for u in users:
+        rol_val = u.role.value if hasattr(u.role, 'value') else str(u.role)
+        rol_norm = rol_val.lower()
+
+        nombre_persona = u.username
+        documento_persona = ""
+        detalle_academico = "Cuenta General de Sistema"
+
+        if rol_norm in ("student", "estudiante"):
+            est = estudiantes_por_user.get(u.id) or estudiantes_por_user.get(u.username.lower())
+            if est:
+                nombre_persona = est["nombre"]
+                documento_persona = est.get("documento") or est.get("matricula", "")
+                detalle_academico = f"Carrera: {est['carrera_id']} • Semestre {est['semestre']}º • Grupo {est.get('grupo', 'G1')}"
+        elif rol_norm in ("teacher", "docente"):
+            prof = profesores_por_user.get(u.id) or profesores_por_user.get(u.username.lower())
+            if prof:
+                nombre_persona = prof["nombre"]
+                documento_persona = prof.get("documento", "")
+                detalle_academico = f"{prof.get('titulo_academico', 'Docente')} • Dpto: {prof['carrera_principal']}"
+        elif rol_norm == "admin":
+            nombre_persona = "Administrador Rectoral"
+            detalle_academico = "Despacho de Rectoría y Control Central"
+
+        resultado.append({
             "id": u.id,
             "username": u.username,
             "email": u.email,
-            "role": u.role.value if hasattr(u.role, 'value') else str(u.role),
+            "role": rol_val,
+            "nombre": nombre_persona,
+            "documento": documento_persona,
+            "detalle_academico": detalle_academico,
             "is_active": u.is_active,
             "failed_attempts": u.failed_attempts,
             "locked_until": u.locked_until.isoformat() if u.locked_until else None,
             "created_at": u.created_at.isoformat() if u.created_at else None
-        }
-        for u in users
-    ]
+        })
+
     return respuesta_exito(resultado)
 
 
 @app.route("/api/admin/crear-usuario", methods=["POST"])
 def admin_crear_usuario() -> Tuple[Response, int]:
-    """Permite al Administrador registrar dinámicamente nuevas cuentas de cualquier rol."""
+    """
+    Permite al Administrador registrar dinámicamente nuevas cuentas de cualquier rol
+    con persistencia atómica en mb_system.db (users) y en universidad.db (estudiantes / profesores).
+    """
     datos = obtener_datos_peticion()
     username = datos.get("username", "").strip()
     email = datos.get("email", "").strip().lower()
     password = datos.get("password", "").strip()
     role_str = datos.get("role", "usuario").strip().lower()
+
+    nombre = (datos.get("nombre") or "").strip()
+    identificacion = (datos.get("identificacion") or datos.get("documento") or "").strip()
 
     if not username or not email or not password:
         return respuesta_error("Nombre de usuario, email y contraseña son obligatorios.", 400)
@@ -1324,20 +1560,65 @@ def admin_crear_usuario() -> Tuple[Response, int]:
     if len(password) < 6:
         return respuesta_error("La contraseña debe tener al menos 6 caracteres.", 400)
 
-    db = get_sqlalchemy_db()
+    # Si es Estudiante o Docente, nombre e identificación son obligatorios
+    if role_str in ("student", "teacher", "docente", "estudiante"):
+        if not nombre or not identificacion:
+            return respuesta_error("El nombre completo y el número de identificación (cédula/documento) son obligatorios para este rol.", 400)
+    else:
+        if not nombre:
+            nombre = username
 
-    # Verificar si usuario o email ya existen
-    existente = db.query(User).filter(
+    db_sqla = get_sqlalchemy_db()
+    db_sqlite = get_db()
+    cursor = db_sqlite.cursor()
+
+    # 1. Validar que username o email no existan en mb_system.db
+    existente_sqla = db_sqla.query(User).filter(
         (User.username.ilike(username)) | (User.email.ilike(email))
     ).first()
-    if existente:
+    if existente_sqla:
         return respuesta_error("El nombre de usuario o el correo electrónico ya se encuentran registrados.", 400)
+
+    # 2. Validar que el número de identificación sea único antes de procesar el guardado
+    if identificacion:
+        cursor.execute("SELECT id, nombre FROM estudiantes WHERE documento = ? OR matricula = ?;", (identificacion, identificacion))
+        est_dup = cursor.fetchone()
+        if est_dup:
+            return respuesta_error(f"El número de identificación '{identificacion}' ya está asignado al estudiante '{est_dup['nombre']}'.", 400)
+
+        cursor.execute("SELECT id, nombre FROM profesores WHERE documento = ?;", (identificacion,))
+        prof_dup = cursor.fetchone()
+        if prof_dup:
+            return respuesta_error(f"El número de identificación '{identificacion}' ya está asignado al docente '{prof_dup['nombre']}'.", 400)
 
     try:
         rol_enum = RoleEnum(role_str)
     except ValueError:
         rol_enum = RoleEnum.usuario
 
+    # Validaciones específicas según el rol
+    if rol_enum == RoleEnum.student:
+        carrera_id = (datos.get("carrera_id") or datos.get("carrera") or "ISW").strip().upper()
+        try:
+            semestre = int(datos.get("semestre", 1))
+            if not (1 <= semestre <= 10):
+                semestre = 1
+        except (ValueError, TypeError):
+            semestre = 1
+        grupo = (datos.get("grupo") or "G1").strip().upper()
+        if grupo not in ("G1", "G2"):
+            grupo = "G1"
+
+        # Validar límite de 30 cupos por carrera
+        count_carrera = cursor.execute("SELECT COUNT(*) FROM estudiantes WHERE carrera_id = ?;", (carrera_id,)).fetchone()[0]
+        if count_carrera >= 30:
+            return respuesta_error(f"La carrera '{carrera_id}' ha alcanzado el límite máximo de 30 cupos (30/30 ocupados).", 400)
+
+    elif rol_enum == RoleEnum.teacher:
+        carrera_prof = (datos.get("carrera_principal") or datos.get("carrera") or datos.get("departamento") or "ISW").strip().upper()
+        titulo_academico = (datos.get("titulo_academico") or "Docente Titular").strip()
+
+    # 3. TRANSACCIÓN ATÓMICA CON ROLLBACK BIDIRECCIONAL
     nuevo_usuario = User(
         username=username,
         email=email,
@@ -1345,17 +1626,71 @@ def admin_crear_usuario() -> Tuple[Response, int]:
         role=rol_enum,
         is_active=True
     )
-    db.add(nuevo_usuario)
-    db.commit()
-    db.refresh(nuevo_usuario)
+    db_sqla.add(nuevo_usuario)
+
+    try:
+        # Flush para obtener nuevo_usuario.id sin confirmar la transacción todavía
+        db_sqla.flush()
+
+        with db_sqlite:
+            if rol_enum == RoleEnum.student:
+                total_est = cursor.execute("SELECT COUNT(*) FROM estudiantes;").fetchone()[0] + 1
+                nuevo_est_id = f"EST-{total_est:03d}"
+                while cursor.execute("SELECT 1 FROM estudiantes WHERE id = ?;", (nuevo_est_id,)).fetchone():
+                    total_est += 1
+                    nuevo_est_id = f"EST-{total_est:03d}"
+
+                matricula = f"2026-{carrera_id}-{total_est:03d}"
+                telefono = datos.get("telefono") or "+52 55 5555-5555"
+                avatar = f"https://api.dicebear.com/7.x/bottts/svg?seed={username}"
+
+                cursor.execute("""
+                    INSERT INTO estudiantes (
+                        id, matricula, documento, nombre, email, telefono, carrera_id,
+                        semestre, grupo, estado, estado_pago, promedio, foto_avatar, username, user_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """, (
+                    nuevo_est_id, matricula, identificacion, nombre, email,
+                    telefono, carrera_id, semestre, grupo, 'Activo', 'Al día',
+                    0.0, avatar, username, nuevo_usuario.id
+                ))
+
+            elif rol_enum == RoleEnum.teacher:
+                total_prof = cursor.execute("SELECT COUNT(*) FROM profesores;").fetchone()[0] + 1
+                nuevo_prof_id = f"DOC-{total_prof:03d}"
+                while cursor.execute("SELECT 1 FROM profesores WHERE id = ?;", (nuevo_prof_id,)).fetchone():
+                    total_prof += 1
+                    nuevo_prof_id = f"DOC-{total_prof:03d}"
+
+                telefono = datos.get("telefono") or "+52 55 5555-0000"
+                cursor.execute("""
+                    INSERT INTO profesores (
+                        id, documento, nombre, email, telefono, titulo_academico,
+                        carrera_principal, estado, username, user_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """, (
+                    nuevo_prof_id, identificacion, nombre, email, telefono,
+                    titulo_academico, carrera_prof, 'Activo', username, nuevo_usuario.id
+                ))
+
+        # Si la inserción en SQLite concluyó sin errores, confirmamos en SQLAlchemy
+        db_sqla.commit()
+        db_sqla.refresh(nuevo_usuario)
+
+    except Exception as e:
+        # Si falló la persistencia en universidad.db, se revierte en SQLAlchemy (mb_system.db)
+        db_sqla.rollback()
+        return respuesta_error(f"Error atómico al registrar datos académicos: {str(e)}", 400)
 
     return respuesta_exito({
-        "mensaje": f"Usuario '{username}' ({rol_enum.value}) creado exitosamente en la base de datos.",
+        "mensaje": f"Usuario '{username}' ({rol_enum.value}) registrado exitosamente con sus datos académicos vinculados.",
         "usuario": {
             "id": nuevo_usuario.id,
             "username": nuevo_usuario.username,
             "email": nuevo_usuario.email,
-            "role": nuevo_usuario.role.value
+            "role": nuevo_usuario.role.value,
+            "nombre": nombre,
+            "identificacion": identificacion
         }
     }, 201)
 
@@ -1371,9 +1706,16 @@ def admin_gestionar_usuario(user_id: int) -> Tuple[Response, int]:
     if request.method == "DELETE":
         if session.get("user_id") == user.id:
             return respuesta_error("No puedes eliminar tu propia cuenta en sesión activa.", 400)
+
+        # Limpieza coordinada en universidad.db
+        db_sqlite = get_db()
+        with db_sqlite:
+            db_sqlite.execute("DELETE FROM estudiantes WHERE user_id = ? OR username = ?;", (user.id, user.username))
+            db_sqlite.execute("DELETE FROM profesores WHERE user_id = ? OR username = ?;", (user.id, user.username))
+
         db.delete(user)
         db.commit()
-        return respuesta_exito({"mensaje": f"Usuario #{user_id} eliminado exitosamente."})
+        return respuesta_exito({"mensaje": f"Usuario #{user_id} y sus registros académicos asociados han sido eliminados exitosamente."})
 
     if request.method == "PUT":
         datos = obtener_datos_peticion()

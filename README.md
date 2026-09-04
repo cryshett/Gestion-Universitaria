@@ -11,29 +11,36 @@
 
 ## 🏛️ Arquitectura del Proyecto y Tecnologías
 
-El sistema sigue una arquitectura desacoplada **MVC / RESTful API**:
+El sistema sigue una arquitectura desacoplada **MVC / RESTful API** con persistencia dual coordinada:
 
-- **Backend / Servidor**: Python 3, Flask Web Framework, SQLite3 Database, Manejo de Contexto Flask `g` (Prevención de Memory Leaks), Autenticación por Sesiones HTTP Cookie.
-- **Frontend / Cliente**: HTML5 Semántico, Vanilla CSS3 (Design Tokens, CSS Variables, Layout Responsivo Grid/Flexbox), JavaScript ES6+ (Async/Await API Client, State Management Pattern), Lucide Icons.
-- **Base de Datos**: Relacional SQLite (`universidad.db`) alimentada por `base_datos.py` con 3 carreras activas, 52 asignaturas (15 exclusivas x 3 + 7 compartidas), 80 estudiantes matriculados y 20 docentes universitarios.
+- **Backend / Servidor**: Python 3.10+, Flask Web Framework, SQLAlchemy ORM (MB-System), SQLite3 Database, Manejo de Contexto Flask `g` (Prevención de Memory Leaks), Seguridad Argon2-cffi y Tokens JWT (Access y Refresh tokens).
+- **Frontend / Cliente**: HTML5 Semántico, Vanilla CSS3 (Design Tokens, CSS Variables, Layout Responsivo Grid/Flexbox), JavaScript ES6+ (Async/Await API Client, State Management Pattern, Micro-animaciones), Lucide Icons.
+- **Bases de Datos**:
+  - **`mb_system.db`** (SQLAlchemy ORM): Persistencia de seguridad con hashing Argon2, roles (`admin`, `teacher`, `student`, `usuario`), conteo de intentos fallidos, bloqueo automático temporal de cuentas, tokens de refresco (`refresh_tokens`) y registro de auditoría de sesiones (`login_history`).
+  - **`universidad.db`** (SQLite): Persistencia de la gestión académica institucional (carreras profesionales, docentes asignados, asignaturas exclusivas y compartidas, estudiantes matriculados, grupos, horarios y solicitudes de cambio).
 
 ### 📁 Estructura de Directorios
 
 ```text
 modulo-universitario-gestion/
 │
-├── app.py                      # Servidor Principal Flask y Rutas API RESTful
-├── base_datos.py               # Generador, Sembrador y Migrador de la BD SQLite (universidad.db)
-├── universidad.db              # Base de Datos Relacional SQLite Persistence
+├── app.py                      # Servidor Principal Flask, API RESTful y Controladores MB-System
+├── app/                        # Módulos Core, Modelos SQLAlchemy y Esquemas de MB-System
+│   ├── core/                   # Configuración y Utilidades de Seguridad (Argon2, JWT)
+│   ├── db/                     # Sesión SQLAlchemy y Base Declarativa
+│   ├── models/                 # Modelos de Usuario, RefreshToken y LoginHistory
+│   ├── routers/                # Enrutadores REST de MB-System
+│   └── schemas/                # Esquemas Pydantic de Validación
 ├── DIAGRAMAS_UML.md            # Diagramas Arquitectónicos UML en Mermaid.js (Clases y Casos de Uso)
 ├── migracion_mysql.sql         # Script Completo de Migración a MySQL (DDL + DML)
 ├── conexion_mysql.py           # Conector Oficial y Pool de Conexión a MySQL
 ├── abrir_modulo.html           # Versión Standalone Offline para Ejecución Local Sin Servidor
 ├── README.md                   # Documentación Oficial del Sistema
+├── CHANGELOG.md                # Historial de Versiones y Registro de Cambios
 │
 ├── templates/                  # Plantillas HTML de las Vistas Protegidas por Rol
 │   ├── login.html              # Vista 1: Autenticación / Portal de Inicio de Sesión
-│   ├── admin.html              # Vista 2: Dashboard Exclusivo del Administrador (Rectoría)
+│   ├── admin.html              # Vista 2: Dashboard Exclusivo del Administrador (Rectoría) y Auth
 │   ├── teacher.html            # Vista 3: Dashboard Exclusivo del Docente
 │   └── student.html            # Vista 4: Dashboard Exclusivo del Estudiante
 │
@@ -41,22 +48,22 @@ modulo-universitario-gestion/
     ├── css/
     │   └── estilos.css         # Sistema de Estilos CSS Modular e Institucional
     └── js/
-        └── app.js              # Controlador Principal JS, Cliente API y Gestión de Modales
+        └── app.js              # Controlador Principal JS, Cliente API y Gestión Dinámica
 ```
 
 ---
 
-## 🔑 Credenciales Predeterminadas por Rol
+## 🔑 Credenciales Iniciales y Control de Acceso (MB-System)
 
-El sistema cuenta con un control de acceso estricto basado en roles (**RBAC**). Puedes ingresar usando las siguientes credenciales en la pantalla de inicio de sesión (`/login`):
+La base de datos se inicializa en estado limpio conservando **exclusivamente la cuenta del Administrador Rectoral** de MB-System. Todas las demás cuentas de docentes y estudiantes se registran de forma dinámica desde el panel de control rectoral con sus datos académicos y número de identificación:
 
-| Rol | Usuario / Correo Institucional | Contraseña Demo | Ruta de Acceso | Componentes Exclusivos |
+| Rol | Usuario / Correo | Contraseña Inicial | Ruta de Acceso | Componentes Exclusivos |
 |---|---|---|---|---|
-| 👑 **Administrador (Rector)** | `admin` | `admin` | `/admin` | Inspector SQLite, Inserción Rectoral, Filtro Financiero, Gestión de Estudiantes y Métricas. |
-| 🧑‍🏫 **Docente** | `roberto.gomez@universidad.edu`<br>*(o `DOC-001`..`DOC-020`)* | `123` | `/teacher` | Asignaturas a su cargo, Matriz de Horario de Docencia, Asignar Calificaciones a sus Alumnos. |
-| 🎓 **Estudiante** | `EST-001` *(o cualquier correo de alumno)* | `123` | `/student` | Horario Individual, Récord de Notas, Banner de Cobranza, Solicitud de Cambio de Grupo con Validación. |
+| 👑 **Administrador (Rector)** | `admin`<br>*(o `admin@mbsystem.com`)* | `Contraseña123` | `/admin` | Gestión de Cuentas Auth, Creación de Usuarios con Perfil Académico, Auditoría `login_history`, Inspector SQLite, Métricas Rectorales. |
+| 🧑‍🏫 **Docente** | *(Registrado por Rector)* | *(Definida por Rector)* | `/teacher` | Dashboard de Cátedra, Horario Docente Semanal, Nómina de Alumnos y Carga de Calificaciones. |
+| 🎓 **Estudiante** | *(Registrado por Rector)* | *(Definida por Rector)* | `/student` | Horario Individual, Récord Académico (Kardex), Solicitud de Cambio de Grupo y Avisos Financieros. |
 
-> 💡 **Tip:** La pantalla `/login` incluye botones de **Acceso Rápido Demo** para cambiar de rol con un solo clic.
+> 🔒 **Seguridad Avanzada**: Tras **3 intentos fallidos consecutivos** de contraseña, la cuenta se bloquea automáticamente por 5 minutos y se audita el motivo exacto, IP y User-Agent en `login_history`.
 
 ---
 
@@ -105,6 +112,12 @@ Si no deseas ejecutar el servidor Flask, puedes abrir directamente el archivo [`
 | `POST` | `/api/estudiantes/<id>/estado-pago` | Modifica estado financiero y envía alerta. | `{"estado_pago": "Pendiente", "mensaje": "..."}` |
 | `POST` | `/api/notificaciones/<id>/leida` | Marca notificación como leída. | N/A |
 | `GET` | `/api/docentes/<id>/dashboard` | Panel docente con materias e inscritos. | N/A |
+| `GET` | `/api/admin/usuarios` | Admin: Lista usuarios registrados con perfil académico vinculado. | N/A |
+| `POST` | `/api/admin/crear-usuario` | Admin: Registra cuenta (mb_system.db) y ficha académica (universidad.db) de forma atómica. | `{"username": "...", "email": "...", "password": "...", "role": "...", "nombre": "...", "identificacion": "...", ...}` |
+| `PUT` | `/api/admin/usuarios/<id>` | Admin: Modifica email, rol, estado activo o contraseña del usuario. | `{"email": "...", "role": "...", "is_active": true, ...}` |
+| `DELETE` | `/api/admin/usuarios/<id>` | Admin: Elimina usuario y sus registros académicos vinculados. | N/A |
+| `GET` | `/api/admin/login-history` | Admin: Retorna registro de auditoría de inicios de sesión y bloqueos. | N/A |
+| `POST` | `/api/reset-db` | Admin: Restablece la base de datos conservando únicamente al Administrador MBSystem. | `{}` |
 
 
 ---

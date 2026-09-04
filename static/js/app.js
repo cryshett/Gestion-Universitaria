@@ -334,21 +334,58 @@ const Controller = {
             });
         });
 
-        // Formulario Crear Cuenta MB-System Admin
+        // Formulario Crear Cuenta MB-System Admin con Datos Académicos Dinámicos
         const formCrearAuth = document.getElementById('form-crear-cuenta-admin');
+        const selectRoleAuth = document.getElementById('auth-select-role');
+        const camposEstudiante = document.getElementById('auth-campos-estudiante');
+        const camposProfesor = document.getElementById('auth-campos-profesor');
+
+        if (selectRoleAuth) {
+            selectRoleAuth.addEventListener('change', () => {
+                const rol = selectRoleAuth.value;
+                if (camposEstudiante) camposEstudiante.style.display = (rol === 'student') ? 'grid' : 'none';
+                if (camposProfesor) camposProfesor.style.display = (rol === 'teacher') ? 'grid' : 'none';
+                UI.refrescarIconos();
+            });
+        }
+
         if (formCrearAuth) {
             formCrearAuth.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const alertDiv = document.getElementById('alert-auth-crear');
                 if (alertDiv) alertDiv.style.display = 'none';
 
+                const nombre = document.getElementById('auth-inp-nombre').value.trim();
+                const identificacion = document.getElementById('auth-inp-documento').value.trim();
                 const username = document.getElementById('auth-inp-username').value.trim();
                 const email = document.getElementById('auth-inp-email').value.trim();
                 const password = document.getElementById('auth-inp-password').value.trim();
                 const role = document.getElementById('auth-select-role').value;
 
+                const payload = {
+                    nombre,
+                    identificacion,
+                    documento: identificacion,
+                    username,
+                    email,
+                    password,
+                    role
+                };
+
+                if (role === 'student') {
+                    payload.carrera_id = document.getElementById('auth-select-carrera')?.value || 'ISW';
+                    payload.carrera = payload.carrera_id;
+                    payload.semestre = parseInt(document.getElementById('auth-select-semestre')?.value || 1, 10);
+                    payload.grupo = document.getElementById('auth-select-grupo')?.value || 'G1';
+                } else if (role === 'teacher') {
+                    payload.carrera_principal = document.getElementById('auth-select-carrera-prof')?.value || 'ISW';
+                    payload.carrera = payload.carrera_principal;
+                    payload.departamento = payload.carrera_principal;
+                    payload.titulo_academico = document.getElementById('auth-inp-titulo-prof')?.value.trim() || 'Docente Titular';
+                }
+
                 try {
-                    const res = await API.crearAuthUser({ username, email, password, role });
+                    const res = await API.crearAuthUser(payload);
                     if (alertDiv) {
                         alertDiv.className = 'alert-toast alert-success';
                         alertDiv.innerText = res.mensaje;
@@ -359,7 +396,16 @@ const Controller = {
                     }
                     UI.mostrarToast(res.mensaje, 'success');
                     formCrearAuth.reset();
+
+                    // Restablecer visibilidad según el rol por defecto (student)
+                    if (selectRoleAuth) selectRoleAuth.value = 'student';
+                    if (camposEstudiante) camposEstudiante.style.display = 'grid';
+                    if (camposProfesor) camposProfesor.style.display = 'none';
+
                     await this.cargarUsuariosAuth();
+                    // Refrescar paneles vinculados
+                    if (role === 'student') this.cargarEstudiantes();
+                    this.cargarDashboard();
                 } catch (err) {
                     if (alertDiv) {
                         alertDiv.className = 'alert-toast alert-error';
@@ -1541,12 +1587,21 @@ const Controller = {
                         return `
                             <tr>
                                 <td><strong>#${u.id}</strong></td>
-                                <td><strong>${u.username}</strong></td>
+                                <td>
+                                    <strong>${u.nombre || u.username}</strong>
+                                    <div style="font-size:0.75rem; color:#64748b;">@${u.username}</div>
+                                </td>
+                                <td><code>${u.documento || '—'}</code></td>
                                 <td><code>${u.email}</code></td>
-                                <td>${roleBadge}</td>
+                                <td>
+                                    ${roleBadge}
+                                    <div style="font-size:0.74rem; color:#475569; margin-top:0.25rem;">${u.detalle_academico || ''}</div>
+                                </td>
                                 <td>${estadoHtml}</td>
-                                <td style="text-align:center;">${u.failed_attempts} / 3</td>
-                                <td style="font-size:0.75rem; color:#64748b;">${u.locked_until ? u.locked_until : '—'}</td>
+                                <td style="text-align:center;">
+                                    ${u.failed_attempts} / 3
+                                    ${u.locked_until ? `<div style="font-size:0.7rem; color:#dc2626;">Bloqueado</div>` : ''}
+                                </td>
                                 <td style="font-size:0.75rem; color:#64748b;">${u.created_at ? u.created_at.split('T')[0] : '—'}</td>
                                 <td style="text-align:center;">
                                     <button class="btn btn-sm btn-outline-danger" onclick="Controller.eliminarUsuarioAuth(${u.id}, '${u.username}')" style="padding:0.25rem 0.5rem; font-size:0.75rem;" title="Eliminar Usuario">

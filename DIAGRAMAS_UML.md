@@ -12,32 +12,51 @@ Representa la jerarquía de entidades, atributos esenciales, métodos de negocio
 classDiagram
     direction TB
 
-    %% Jerarquía de Autenticación y Usuarios
+    %% Jerarquía de Autenticación MB-System (mb_system.db)
     class Usuario {
-        +String id
+        +int id
         +String username
         +String email
-        +String password_hash
-        +String rol
-        +autenticar(password) bool
-        +cerrarSesion() void
-        +cambiarPassword(nueva_pass) bool
+        +String hashed_password
+        +RoleEnum role
+        +bool is_active
+        +int failed_attempts
+        +DateTime locked_until
+        +DateTime created_at
+        +verificarPassword(password) bool
+        +bloquearCuenta(minutos) void
     }
 
-    class Admin {
-        +String nivel_acceso
-        +String departamento
-        +crearEstudiante(datos) Estudiante
-        +actualizarEstadoPago(est_id, estado) void
-        +asignarDocente(grupo_id, docente_id) void
-        +gestionarGrupos(asg_id, aula, cupo) Grupo
-        +restablecerBaseDatos() bool
+    class RefreshToken {
+        +String jti
+        +int user_id
+        +DateTime expires_at
+        +DateTime created_at
     }
 
-    class Docente {
-        +String codigo_docente
-        +String especialidad
-        +String cubiculo
+    class LoginHistory {
+        +int id
+        +int user_id
+        +String username_attempted
+        +String ip_address
+        +String user_agent
+        +bool success
+        +String failure_reason
+        +DateTime login_at
+    }
+
+    %% Jerarquía Académica (universidad.db)
+    class Profesor {
+        +String id
+        +String documento
+        +String nombre
+        +String email
+        +String telefono
+        +String titulo_academico
+        +String carrera_principal
+        +String estado
+        +int user_id
+        +String username
         +consultarGruposAsignados() List~Grupo~
         +obtenerNominaAlumnos(grupo_id) List~Estudiante~
         +registrarCalificacion(est_id, asg_id, nota) bool
@@ -45,12 +64,20 @@ classDiagram
     }
 
     class Estudiante {
+        +String id
         +String matricula
+        +String documento
+        +String nombre
+        +String email
+        +String telefono
         +String carrera_id
         +int semestre
+        +String grupo
         +String estado
         +String estado_pago
         +float promedio
+        +int user_id
+        +String username
         +consultarHorarioIndividual() List~Horario~
         +consultarRecordAcademico() List~Calificacion~
         +solicitarCambioGrupo(asg_id, grupo_destino) bool
@@ -122,16 +149,18 @@ classDiagram
         +marcarComoLeida() void
     }
 
-    %% Relaciones de Herencia
-    Usuario <|-- Admin : Especializa
-    Usuario <|-- Docente : Especializa
-    Usuario <|-- Estudiante : Especializa
+    %% Relaciones de Autenticación y Vinculación Dual (mb_system.db <-> universidad.db)
+    Usuario "1" *-- "0..*" RefreshToken : emite
+    Usuario "1" *-- "0..*" LoginHistory : audita
+    Usuario "1" <--> "0..1" Estudiante : vinculación atómica
+    Usuario "1" <--> "0..1" Profesor : vinculación atómica
 
-    %% Relaciones de Dominio y Negocio
+    %% Relaciones de Dominio Académico
     Carrera "1" --> "0..*" Estudiante : matricula
     Carrera "1" --> "1..*" Asignatura : plan de estudios
+    Carrera "1" --> "0..*" Profesor : adscripción departamental
     Asignatura "1" --> "1..*" Grupo : se oferta en
-    Docente "1" --> "0..*" Grupo : imparte
+    Profesor "1" --> "0..*" Grupo : imparte
     Grupo "1" *-- "1..*" Horario : sesiona en
     Estudiante "1" --> "0..*" Calificacion : historial de
     Asignatura "1" --> "0..*" Calificacion : corresponde a
@@ -143,11 +172,14 @@ classDiagram
 
 | Relación | Tipo | Cardinalidad | Descripción de Negocio |
 |---|:---:|:---:|---|
-| **Usuario $\rightarrow$ Admin / Docente / Estudiante** | Herencia | `1:1` | Generalización del sistema de autenticación con RBAC (*Role-Based Access Control*). |
-| **Carrera $\rightarrow$ Estudiante** | Asociación | `1:N` | Cada alumno pertenece a un programa de pregrado (`ISW`, `MED`, `DER`). |
+| **Usuario $\leftrightarrow$ Estudiante / Profesor** | Asociación 1:1 | `1:0..1` | Vinculación atómica entre credenciales MB-System (`mb_system.db`) y la ficha académica (`universidad.db`). |
+| **Usuario $\rightarrow$ RefreshToken** | Composición | `1:N` | Gestión de tokens de actualización para persistencia de sesión JWT. |
+| **Usuario $\rightarrow$ LoginHistory** | Composición | `1:N` | Auditoría de seguridad: IP, User-Agent, éxito, motivo de fallo y control de bloqueos. |
+| **Carrera $\rightarrow$ Estudiante** | Asociación | `1:N` | Cada alumno pertenece a un programa de pregrado (`ISW`, `MED`, `DER`) con límite máx 30. |
 | **Carrera $\rightarrow$ Asignatura** | Composición | `1:N` | Malla curricular estructurada por niveles (1 al 8). |
+| **Carrera $\rightarrow$ Profesor** | Asociación | `1:N` | Adscripción de docentes por facultad o departamento principal. |
 | **Asignatura $\rightarrow$ Grupo** | Asociación | `1:N` | Cada asignatura se divide en secciones (`G1`, `G2`). |
-| **Docente $\rightarrow$ Grupo** | Asociación | `1:N` | Asignación de carga académica por cátedra. |
+| **Profesor $\rightarrow$ Grupo** | Asociación | `1:N` | Asignación de carga académica y cátedra docente. |
 | **Grupo $\rightarrow$ Horario** | Composición | `1:N` | Bloques semanales (ej. Lun-Mié 07:00-09:00) con control de no superposición. |
 | **Estudiante $\rightarrow$ Calificación** | Asociación | `1:N` | Récord académico ponderado (escala 0.0 - 5.0). |
 | **Grupo $\leftrightarrow$ Estudiante** | Asociación N:M | `N:M` | Control estricto de aforo: máximo **15 estudiantes por aula**. |
@@ -299,6 +331,54 @@ sequenceDiagram
             BD-->>C: Confirmación OK
             C-->>UI: 200 OK: "Solicitud aprobada y procesada con éxito"
             UI-->>E: Renderiza nuevo horario actualizado en pantalla
+        end
+    end
+    deactivate C
+```
+
+---
+
+## 5. Diagrama de Secuencia: Registro Académico y Transacción Atómica (MB-System)
+
+Ilustra la sincronización bidireccional y control transaccional atómico al registrar un nuevo usuario con perfil académico desde el panel de Rectoría:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Administrador (Rector)
+    participant UI as Panel Web Admin (admin.html)
+    participant C as Controlador (app.py)
+    participant MBS as BD Auth (mb_system.db)
+    participant UNI as BD Académica (universidad.db)
+
+    A->>UI: Ingresa datos comunes (Nombre, Cédula, Usuario, Email, Clave) y datos de rol (Carrera, Semestre, Grupo)
+    UI->>C: POST /api/admin/crear-usuario {username, email, role, nombre, identificacion, carrera_id, ...}
+    activate C
+
+    C->>MBS: Validar unicidad de username y email
+    alt Usuario o Email Duplicado
+        C-->>UI: 400 Bad Request: "El usuario o correo ya está registrado"
+    else Datos de Usuario Válidos
+        C->>UNI: SELECT id FROM estudiantes/profesores WHERE documento = ?
+        alt Documento / Cédula Duplicada
+            UNI-->>C: Registro existente
+            C-->>UI: 400 Bad Request: "El número de identificación ya está asignado"
+        else Identificación Única
+            C->>MBS: db_sqla.add(User) + db_sqla.flush()
+            MBS-->>C: ID de Usuario asignado (sin commit)
+
+            alt Inserción en universidad.db exitosa
+                C->>UNI: INSERT INTO estudiantes / profesores (datos académicos, user_id, username)
+                UNI-->>C: Confirmación de inserción SQLite OK
+                C->>MBS: db_sqla.commit() (Confirmación definitiva)
+                C-->>UI: 201 Created: "Usuario registrado con datos académicos"
+                UI-->>A: Muestra toast verde y refresca tabla de cuentas
+            else Error en universidad.db (Rollback Atómico)
+                UNI-->>C: Error de integridad o aforo
+                C->>MBS: db_sqla.rollback() (Reversión total de credenciales)
+                C-->>UI: 400 Bad Request: "Error al registrar datos académicos"
+                UI-->>A: Muestra toast rojo con motivo exacto
+            end
         end
     end
     deactivate C

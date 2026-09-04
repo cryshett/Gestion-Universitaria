@@ -4,6 +4,24 @@ Todas las modificaciones notables del proyecto **UniGestion PRO** están documen
 
 ---
 
+## 🛡️ [v2.2.0] - 2026-09-04 (Autenticación MB-System y Registro Académico Atómico)
+### Añadido
+- **Integración de Autenticación MB-System**:
+  - Implementación de hashing criptográfico con **Argon2** y generación de tokens de acceso y refresco con **PyJWT**.
+  - Registro de auditoría exhaustiva en la tabla `login_history` (IP, User-Agent, éxito/fallo y causal de error).
+  - Bloqueo temporal automático de cuentas por 5 minutos tras 3 intentos fallidos consecutivos de contraseña.
+  - Depuración completa de usuarios demo heredados, conservando exclusivamente la cuenta del Administrador Rectoral (`admin` / `admin@mbsystem.com`).
+- **Ampliación de Registro de Usuarios con Datos Académicos**:
+  - Formulario dinámico e interactivo en el panel rectoral para capturar Nombre Completo y Cédula/Documento común.
+  - Alternancia dinámica según el rol seleccionado:
+    - **Estudiante**: Selección de Carrera (`ISW`, `MED`, `DER`), Semestre curricular (1º a 8º) y Grupo académico (`G1`, `G2`).
+    - **Docente**: Selección de Carrera / Departamento asignado y Título/Grado académico.
+  - **Validación de Unicidad**: Control previo de duplicidad de número de identificación en estudiantes y profesores.
+  - **Persistencia Dual Atómica**: Creación coordinada entre `mb_system.db` (`users`) y `universidad.db` (`estudiantes`/`profesores`) con mecanismo de rollback bidireccional ante fallos.
+  - Enriquecimiento del endpoint `/api/me` y visualización de perfiles académicos vinculados en la tabla de usuarios del Administrador.
+
+---
+
 ## 🚀 [v2.1.0] - 2026-09-03 (Fase Final & Documentación Completa)
 ### Añadido
 - Módulo completo de **Notificaciones y Estado Financiero** de estudiantes (`Al día`, `Pendiente`, `Bloqueado`).

@@ -70,7 +70,10 @@ def run_tests():
         "username": "docente_nuevo",
         "email": "docente.nuevo@universidad.edu",
         "password": "ClaveDocente2026!",
-        "role": "teacher"
+        "role": "teacher",
+        "nombre": "Prof. Roberto Gómez",
+        "identificacion": "1122334455",
+        "carrera_principal": "ISW"
     })
     assert res_crear_doc.status_code == 201, f"Error al crear docente: {res_crear_doc.json}"
     print("[OK] Docente creado dinámicamente desde el panel de control.")
