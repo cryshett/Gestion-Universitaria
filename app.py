@@ -25,7 +25,7 @@ from app.db.base import Base
 from app.models.user import User, RoleEnum
 from app.models.token import RefreshToken
 from app.models.login_history import LoginHistory
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
 
 # Creación/Metadatos de tablas mb-system
