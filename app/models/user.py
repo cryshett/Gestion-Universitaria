@@ -36,8 +36,3 @@ class User(Base):
 
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     login_history = relationship("LoginHistory", back_populates="user", cascade="all, delete-orphan")
-    grupos_docente = relationship("Grupo", back_populates="profesor")
-
-    @property
-    def nombre(self):
-        return self.username

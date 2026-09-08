@@ -54,8 +54,8 @@
                 <button class="sidebar-link" data-target="vista-grupos" aria-label="Grupos y Aulas">
                     <i data-lucide="layers"></i> <span>Grupos y Aulas (Máx 15)</span>
                 </button>
-                <button class="sidebar-link" data-target="vista-basedatos" aria-label="Base de Datos">
-                    <i data-lucide="database"></i> <span id="nav-bd-title">Base de Datos</span>
+                <button class="sidebar-link" data-target="vista-basedatos" aria-label="Base de Datos SQLite">
+                    <i data-lucide="database"></i> <span>Base de Datos (SQLite)</span>
                 </button>
                 <button class="sidebar-link" data-target="vista-solicitudes" aria-label="Solicitudes de Cambio">
                     <i data-lucide="arrow-right-left"></i> <span>Solicitudes de Cambio</span>
@@ -67,10 +67,6 @@
             </nav>
 
             <div class="sidebar-footer">
-                <div id="badge-engine-status" style="display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.6rem; border-radius:6px; font-size:0.75rem; background:#0f172a; color:#38bdf8; margin-bottom:0.6rem; border:1px solid #334155;">
-                    <i data-lucide="database" style="width:14px; height:14px; flex-shrink:0;"></i>
-                    <span id="txt-engine-status" style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">BD: Conectando...</span>
-                </div>
                 <button id="btn-reset-db" class="btn btn-outline-danger" style="width: 100%; font-size: 0.8rem;">
                     <i data-lucide="rotate-ccw"></i> <span>Restablecer BD</span>
                 </button>
@@ -96,20 +92,6 @@
                     </a>
                 </div>
             </header>
-
-            <!-- MENSAJES FLASH INSTITUCIONALES -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                <div class="flash-messages-container" style="padding: 1rem 2rem 0 2rem;">
-                  {% for category, message in messages %}
-                    <div class="alert-toast alert-{{ 'success' if category == 'success' else 'error' }}" style="padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; background: {{ '#dcfce7' if category == 'success' else '#fee2e2' }}; color: {{ '#166534' if category == 'success' else '#991b1b' }}; border: 1px solid {{ '#86efac' if category == 'success' else '#fca5a5' }};">
-                      <span><strong>{{ 'Éxito: ' if category == 'success' else 'Aviso: ' }}</strong>{{ message }}</span>
-                      <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; font-weight:bold; font-size:1.1rem; color:inherit;">&times;</button>
-                    </div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            {% endwith %}
 
             <!-- VISTAS / SECCIONES DINÁMICAS -->
             <div class="content-wrapper">
@@ -289,10 +271,6 @@
                                 <option value="compartida">Compartidas (7 Generales)</option>
                             </select>
                         </div>
-
-                        <button id="btn-nueva-materia" class="btn btn-primary" style="white-space:nowrap; margin-left:auto;">
-                            <i data-lucide="book-plus"></i> Nueva Materia
-                        </button>
                     </div>
 
                     <div id="asignaturas-contenedor" class="asignaturas-grid"></div>
@@ -303,7 +281,7 @@
                     <div class="pensum-header-box">
                         <div class="pensum-intro">
                             <h2>Matriz Semanal de Horarios de Clases (7:00 AM - 12:00 PM)</h2>
-                            <p>Organización de asignaturas en bloques con asignación de aulas, grupos académicos y docentes oficiales.</p>
+                            <p>Organización de asignaturas en bloques de 2 horas con asignación de aulas, grupos académicos y 20 docentes oficiales.</p>
                         </div>
                     </div>
 
@@ -323,15 +301,6 @@
                                 <option value="G1">Grupo G1</option>
                                 <option value="G2">Grupo G2</option>
                             </select>
-                        </div>
-
-                        <div style="margin-left:auto; display:flex; gap:0.5rem;">
-                            <button id="btn-nuevo-grupo" type="button" class="btn btn-secondary" style="white-space:nowrap;">
-                                <i data-lucide="layers"></i> Nuevo Grupo
-                            </button>
-                            <button id="btn-nuevo-horario" class="btn btn-primary" style="white-space:nowrap;">
-                                <i data-lucide="calendar-plus"></i> Asignar Horario
-                            </button>
                         </div>
                     </div>
 
@@ -384,10 +353,6 @@
                             <button id="btn-grupo-grid" class="active" title="Vista Tarjetas Compactas"><i data-lucide="grid"></i></button>
                             <button id="btn-grupo-tabla" title="Vista Lista Detallada"><i data-lucide="list"></i></button>
                         </div>
-
-                        <button id="btn-nuevo-grupo" class="btn btn-primary" style="white-space:nowrap; margin-left:1rem;">
-                            <i data-lucide="layers"></i> Nuevo Grupo
-                        </button>
                     </div>
 
                     <div id="grupos-contenedor" class="asignaturas-grid"></div>
@@ -934,238 +899,6 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary"><i data-lucide="send"></i> Guardar y Notificar</button>
-                </div>
-            </form>
-    <!-- MODAL 1: CREAR / EDITAR MATERIA -->
-    <div id="modal-materia" class="modal-backdrop" role="dialog" aria-modal="true">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-header-icon" style="background:#e0f2fe; color:#0284c7;">
-                    <i data-lucide="book-open"></i>
-                </div>
-                <div>
-                    <h3 id="modal-materia-titulo">Nueva Asignatura / Materia</h3>
-                    <p>Configuración del plan de estudios y catálogo curricular</p>
-                </div>
-                <button type="button" class="btn-close-modal" aria-label="Cerrar">&times;</button>
-            </div>
-
-            <form id="form-materia" method="POST" action="{{ url_for('crear_materia') }}">
-                <input type="hidden" id="inp-materia-id" name="id" value="">
-                <div class="modal-body" style="display:flex; flex-direction:column; gap:1rem;">
-                    <div class="form-row" style="display:grid; grid-template-columns:1fr 2fr; gap:1rem;">
-                        <div>
-                            <label for="inp-materia-codigo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Código *</label>
-                            <input type="text" id="inp-materia-codigo" name="codigo" required placeholder="Ej: ISW-101" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem; text-transform:uppercase;">
-                        </div>
-                        <div>
-                            <label for="inp-materia-nombre" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Nombre de la Asignatura *</label>
-                            <input type="text" id="inp-materia-nombre" name="nombre" required placeholder="Ej: Programación Orientada a Objetos" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                        </div>
-                    </div>
-
-                    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                        <div>
-                            <label for="select-materia-carrera" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Carrera Profesional *</label>
-                            <select id="select-materia-carrera" name="carrera" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                                <option value="ISW">Ingeniería de Software (ISW)</option>
-                                <option value="MED">Medicina Humana (MED)</option>
-                                <option value="DER">Derecho y C. Políticas (DER)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="inp-materia-creditos" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Créditos Académicos *</label>
-                            <input type="number" id="inp-materia-creditos" name="creditos" min="1" max="12" value="4" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                        </div>
-                    </div>
-
-                    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                        <div>
-                            <label for="select-materia-nivel" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Nivel Curricular *</label>
-                            <select id="select-materia-nivel" name="nivel" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                                <option value="1">Nivel 1: Fundamentos (1º-2º Semestre)</option>
-                                <option value="2">Nivel 2: Intermedio (3º-5º Semestre)</option>
-                                <option value="3">Nivel 3: Avanzado (6º-8º Semestre)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="select-materia-tipo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Tipo de Asignatura *</label>
-                            <select id="select-materia-tipo" name="tipo" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                                <option value="exclusiva">Exclusiva de Carrera</option>
-                                <option value="compartida">Compartida (General)</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
-                    <button type="submit" id="btn-guardar-materia" class="btn btn-primary"><i data-lucide="save"></i> Guardar Asignatura</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL 2: CREAR / EDITAR GRUPO -->
-    <div id="modal-grupo" class="modal-backdrop" role="dialog" aria-modal="true">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-header-icon" style="background:#fef3c7; color:#d97706;">
-                    <i data-lucide="layers"></i>
-                </div>
-                <div>
-                    <h3 id="modal-grupo-titulo">Nuevo Grupo Académico</h3>
-                    <p>Creación de sección de clase y asignación de profesor responsable</p>
-                </div>
-                <button type="button" class="btn-close-modal" aria-label="Cerrar">&times;</button>
-            </div>
-
-            <form id="form-grupo" method="POST" action="{{ url_for('crear_grupo') }}">
-                <input type="hidden" id="inp-grupo-id" name="id" value="">
-                <div class="modal-body" style="display:flex; flex-direction:column; gap:1rem;">
-                    <div>
-                        <label for="select-grupo-materia" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Materia / Asignatura *</label>
-                        <select id="select-grupo-materia" name="materia_id" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                            <option value="">-- Seleccionar Asignatura --</option>
-                            {% if materias %}
-                                {% for m in materias %}
-                                    <option value="{{ m.id }}">{{ m.codigo }} - {{ m.nombre }} ({{ m.carrera }})</option>
-                                {% endfor %}
-                            {% endif %}
-                        </select>
-                    </div>
-
-                    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                        <div>
-                            <label for="inp-grupo-nombre" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Nombre del Grupo *</label>
-                            <input type="text" id="inp-grupo-nombre" name="codigo_grupo" required placeholder="Ej: G1, G2, Secc A" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem; text-transform:uppercase;">
-                        </div>
-                        <div>
-                            <label for="inp-grupo-cupo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Cupo Máximo (Aforo) *</label>
-                            <input type="number" id="inp-grupo-cupo" name="cupo_maximo" min="5" max="40" value="15" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="select-grupo-profesor" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Profesor / Docente Titular Responsable</label>
-                        <select id="select-grupo-profesor" name="profesor_id" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                            <option value="">-- Sin asignar por ahora --</option>
-                            {% if profesores %}
-                                {% for p in profesores %}
-                                    <option value="{{ p.id }}">{{ p.nombre }}</option>
-                                {% endfor %}
-                            {% endif %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
-                    <button type="submit" id="btn-guardar-grupo" class="btn btn-primary"><i data-lucide="check-circle"></i> Guardar Grupo</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL 3: ASIGNAR HORARIO CON VALIDACIÓN ANTI-CRUCES -->
-    <div id="modal-horario" class="modal-backdrop" role="dialog" aria-modal="true">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-header-icon" style="background:#ecfdf5; color:#059669;">
-                    <i data-lucide="calendar"></i>
-                </div>
-                <div>
-                    <h3>Asignación de Horario y Aula</h3>
-                    <p>Programación semanal con validación automática contra cruces de docente y aula</p>
-                </div>
-                <button type="button" class="btn-close-modal" aria-label="Cerrar">&times;</button>
-            </div>
-
-            <form id="form-horario" method="POST" action="{{ url_for('crear_horario') }}">
-                <input type="hidden" id="inp-horario-id" name="id" value="">
-                <div class="modal-body" style="display:flex; flex-direction:column; gap:1rem;">
-                    <!-- Alerta dinámica de conflicto -->
-                    <div id="alerta-conflicto-horario" style="display:none; padding:0.75rem 1rem; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:0.82rem; line-height:1.4;">
-                        <div style="display:flex; align-items:center; gap:0.5rem; font-weight:700; margin-bottom:0.25rem;">
-                            <i data-lucide="alert-triangle" style="width:16px; height:16px;"></i> Cruce de Horario Detectado
-                        </div>
-                        <div id="txt-conflicto-horario"></div>
-                    </div>
-
-                    <div>
-                        <label for="select-horario-grupo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Grupo Académico *</label>
-                        <select id="select-horario-grupo" name="grupo_id" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                            <option value="">-- Seleccionar Grupo --</option>
-                            {% if grupos %}
-                                {% for g in grupos %}
-                                    <option value="{{ g.id }}">{{ g.materia.nombre if g.materia else 'Materia' }} - Grupo {{ g.codigo_grupo }}</option>
-                                {% endfor %}
-                            {% endif %}
-                        </select>
-                    </div>
-
-                    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem;">
-                        <div>
-                            <label for="select-horario-dia" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Día de Semana *</label>
-                            <select id="select-horario-dia" name="dia" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                                <option value="Lunes">Lunes</option>
-                                <option value="Martes">Martes</option>
-                                <option value="Miércoles">Miércoles</option>
-                                <option value="Jueves">Jueves</option>
-                                <option value="Viernes">Viernes</option>
-                                <option value="Sábado">Sábado</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="select-horario-inicio" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Hora Inicio *</label>
-                            <select id="select-horario-inicio" name="hora_inicio" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                                <option value="07:00">07:00 AM</option>
-                                <option value="09:00">09:00 AM</option>
-                                <option value="10:00">10:00 AM</option>
-                                <option value="12:00">12:00 PM</option>
-                                <option value="14:00">02:00 PM</option>
-                                <option value="16:00">04:00 PM</option>
-                                <option value="18:00">06:00 PM</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="select-horario-fin" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Hora Fin *</label>
-                            <select id="select-horario-fin" name="hora_fin" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                                <option value="09:00">09:00 AM</option>
-                                <option value="11:00">11:00 AM</option>
-                                <option value="12:00">12:00 PM</option>
-                                <option value="14:00">02:00 PM</option>
-                                <option value="16:00">04:00 PM</option>
-                                <option value="18:00">06:00 PM</option>
-                                <option value="20:00">08:00 PM</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                        <div>
-                            <label for="inp-horario-aula" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Aula o Salón Asignado *</label>
-                            <select id="inp-horario-aula" name="aula" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                                <option value="Aula 101">Aula 101</option>
-                                <option value="Aula 102">Aula 102</option>
-                                <option value="Aula 201">Aula 201</option>
-                                <option value="Aula 202">Aula 202</option>
-                                <option value="Lab Software 1">Lab Software 1</option>
-                                <option value="Lab Software 2">Lab Software 2</option>
-                                <option value="Lab Medicina 1">Lab Medicina 1</option>
-                                <option value="Auditorio Principal">Auditorio Principal</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="inp-horario-edificio" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Edificio / Pabellón</label>
-                            <input type="text" id="inp-horario-edificio" name="edificio" value="Edificio Central" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
-                    <button type="submit" id="btn-guardar-horario" class="btn btn-primary"><i data-lucide="clock"></i> Confirmar Horario</button>
                 </div>
             </form>
         </div>

@@ -10,7 +10,7 @@ Patrones de Diseño y Buenas Prácticas Aplicados:
 4. Separación de Responsabilidades: Rutas limpias, validación de entrada e invocación modular.
 """
 
-from flask import Flask, render_template, jsonify, request, g, Response, session, redirect, url_for, flash
+from flask import Flask, render_template, jsonify, request, g, Response, session, redirect, url_for
 import sqlite3
 import os
 import uuid
@@ -18,40 +18,164 @@ import unicodedata
 import re
 from datetime import datetime, timedelta
 from typing import Tuple, Dict, Any, List
-from sqlalchemy import or_, and_, func
 
-# Importaciones de SQLAlchemy Models & DB (Sistema Unificado)
+# Importaciones de mb-system Auth & DB
 from app.db.session import engine, SessionLocal
 from app.db.base import Base
 from app.models.user import User, RoleEnum
 from app.models.token import RefreshToken
 from app.models.login_history import LoginHistory
-from app.models.materia import Materia
-from app.models.grupo import Grupo
-from app.models.horario import Horario
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
 
-# Creación automática de todas las tablas unificadas en PostgreSQL (Render) o SQLite local
+# Creación/Metadatos de tablas mb-system
 Base.metadata.create_all(bind=engine)
 
-from app.db.connection import get_raw_connection, init_database_tables, get_db_inspector_info, DBConnection
-
 def init_universidad_db():
-    """Inicializa y asegura la estructura de soporte para vistas de compatibilidad."""
-    conn = get_raw_connection()
-    try:
-        init_database_tables(conn)
-    finally:
-        conn.close()
+    """Inicializa y asegura la estructura completa de tablas en universidad.db (SQLite)."""
+    conn = sqlite3.connect("universidad.db")
+    cursor = conn.cursor()
+    cursor.executescript("""
+        CREATE TABLE IF NOT EXISTS carreras (
+            id VARCHAR(10) PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            codigo VARCHAR(20) UNIQUE NOT NULL,
+            duracion_semestres INT NOT NULL,
+            total_creditos INT NOT NULL,
+            cupos_maximos INT NOT NULL DEFAULT 30,
+            color VARCHAR(20) NOT NULL,
+            descripcion TEXT NOT NULL,
+            icono VARCHAR(50) NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS profesores (
+            id VARCHAR(20) PRIMARY KEY,
+            documento VARCHAR(20) UNIQUE NOT NULL,
+            nombre VARCHAR(100) NOT NULL,
+            primer_nombre VARCHAR(50) DEFAULT '',
+            segundo_nombre VARCHAR(50) DEFAULT '',
+            primer_apellido VARCHAR(50) DEFAULT '',
+            segundo_apellido VARCHAR(50) DEFAULT '',
+            email VARCHAR(100) UNIQUE NOT NULL,
+            telefono VARCHAR(30) DEFAULT '+52 55 5555-0000',
+            titulo_academico VARCHAR(100) DEFAULT 'Docente Titular',
+            carrera_principal VARCHAR(10) NOT NULL,
+            estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+            username VARCHAR(50) DEFAULT '',
+            user_id INT DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS asignaturas (
+            id VARCHAR(20) PRIMARY KEY,
+            codigo VARCHAR(20) UNIQUE NOT NULL,
+            nombre VARCHAR(150) NOT NULL,
+            creditos INT NOT NULL,
+            nivel INT NOT NULL CHECK (nivel IN (1, 2, 3)),
+            tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('exclusiva', 'compartida')),
+            carrera_id VARCHAR(10) DEFAULT NULL,
+            carreras_compartidas VARCHAR(100) DEFAULT NULL,
+            docente VARCHAR(100) NOT NULL,
+            horario VARCHAR(50) NOT NULL,
+            grupo VARCHAR(10) NOT NULL DEFAULT 'G1',
+            aula VARCHAR(50) NOT NULL DEFAULT 'Aula 101'
+        );
+
+        CREATE TABLE IF NOT EXISTS estudiantes (
+            id VARCHAR(20) PRIMARY KEY,
+            matricula VARCHAR(30) UNIQUE NOT NULL,
+            documento VARCHAR(20) UNIQUE,
+            nombre VARCHAR(100) NOT NULL,
+            primer_nombre VARCHAR(50) DEFAULT '',
+            segundo_nombre VARCHAR(50) DEFAULT '',
+            primer_apellido VARCHAR(50) DEFAULT '',
+            segundo_apellido VARCHAR(50) DEFAULT '',
+            email VARCHAR(100) NOT NULL,
+            telefono VARCHAR(30) DEFAULT '+52 55 5555-5555',
+            carrera_id VARCHAR(10) NOT NULL,
+            semestre INT NOT NULL CHECK (semestre BETWEEN 1 AND 10),
+            grupo VARCHAR(10) NOT NULL DEFAULT 'G1',
+            estado VARCHAR(20) NOT NULL CHECK (estado IN ('Activo', 'En Riesgo', 'Egresado', 'Suspendido')) DEFAULT 'Activo',
+            estado_pago VARCHAR(20) NOT NULL DEFAULT 'Al día' CHECK (estado_pago IN ('Al día', 'Pendiente', 'Bloqueado')),
+            promedio DOUBLE NOT NULL DEFAULT 0.0,
+            foto_avatar VARCHAR(255) NOT NULL,
+            username VARCHAR(50) DEFAULT '',
+            user_id INT DEFAULT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS inscripciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante_id VARCHAR(20) NOT NULL,
+            asignatura_id VARCHAR(20) NOT NULL,
+            nota DOUBLE NOT NULL CHECK (nota BETWEEN 0.0 AND 5.0),
+            periodo VARCHAR(20) NOT NULL DEFAULT '2026-1',
+            UNIQUE (estudiante_id, asignatura_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS notificaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante_id VARCHAR(20) NOT NULL,
+            titulo VARCHAR(150) NOT NULL,
+            mensaje TEXT NOT NULL,
+            tipo VARCHAR(20) NOT NULL DEFAULT 'pago' CHECK (tipo IN ('pago', 'academico', 'sistema')),
+            fecha VARCHAR(30) NOT NULL,
+            leido TINYINT(1) NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS solicitudes_cambio_grupo (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante_id VARCHAR(20) NOT NULL,
+            asignatura_id VARCHAR(20) NOT NULL,
+            grupo_actual VARCHAR(10) NOT NULL,
+            grupo_solicitado VARCHAR(10) NOT NULL,
+            motivo TEXT NOT NULL,
+            estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+            fecha VARCHAR(30) NOT NULL,
+            fecha_resolucion VARCHAR(30) DEFAULT NULL,
+            respuesta_admin TEXT DEFAULT NULL
+        );
+    """)
+
+    # Asegurar columnas necesarias en caso de tablas preexistentes
+    def agregar_columna_si_falta(tabla, columna, definicion):
+        cols = [c[1] for c in cursor.execute(f"PRAGMA table_info({tabla});").fetchall()]
+        if columna not in cols:
+            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion};")
+
+    agregar_columna_si_falta("estudiantes", "documento", "VARCHAR(20) UNIQUE")
+    agregar_columna_si_falta("estudiantes", "grupo", "VARCHAR(10) DEFAULT 'G1'")
+    agregar_columna_si_falta("estudiantes", "username", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "user_id", "INT DEFAULT NULL")
+    agregar_columna_si_falta("estudiantes", "primer_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "segundo_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "primer_apellido", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("estudiantes", "segundo_apellido", "VARCHAR(50) DEFAULT ''")
+
+    agregar_columna_si_falta("profesores", "username", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "user_id", "INT DEFAULT NULL")
+    agregar_columna_si_falta("profesores", "primer_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "segundo_nombre", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "primer_apellido", "VARCHAR(50) DEFAULT ''")
+    agregar_columna_si_falta("profesores", "segundo_apellido", "VARCHAR(50) DEFAULT ''")
+
+    # Poblar carreras institucionales si la tabla está vacía
+    cursor.execute("SELECT COUNT(*) FROM carreras;")
+    if cursor.fetchone()[0] == 0:
+        carreras_base = [
+            ("ISW", "Ingeniería de Software", "ISW", 8, 160, 30, "#3b82f6", "Formación integral en desarrollo y arquitectura de software.", "code"),
+            ("MED", "Medicina Humana", "MED", 10, 220, 30, "#10b981", "Excelencia médica, ciencias biológicas y salud comunitaria.", "stethoscope"),
+            ("DER", "Derecho y Ciencias Políticas", "DER", 8, 150, 30, "#8b5cf6", "Ciencias jurídicas, derecho civil, penal y corporativo.", "scale")
+        ]
+        cursor.executemany("INSERT INTO carreras VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", carreras_base)
+
+    conn.commit()
+    conn.close()
 
 init_universidad_db()
 
-def asegurar_datos_iniciales_academicos():
-    """Garantiza la existencia del administrador, docentes oficiales y asignaturas base en el ORM."""
+def asegurar_admin_mbsystem():
+    """Garantiza la existencia del usuario Administrador exclusivo de MBSystem (admin / admin@mbsystem.com)."""
     db = SessionLocal()
     try:
-        # 1. Administrador general
         existing_admin = db.query(User).filter(
             (User.username == "admin") | (User.email == "admin@mbsystem.com")
         ).first()
@@ -64,59 +188,11 @@ def asegurar_datos_iniciales_academicos():
                 is_active=True
             )
             db.add(admin)
-
-        # 2. Docentes para asignación académica
-        docentes_base = [
-            {"username": "Prof. Alan Turing", "email": "alan.turing@universidad.edu"},
-            {"username": "Prof. Ada Lovelace", "email": "ada.lovelace@universidad.edu"},
-            {"username": "Prof. Roberto Gómez", "email": "roberto.gomez@universidad.edu"}
-        ]
-        docentes_creados = []
-        for d in docentes_base:
-            u = db.query(User).filter((User.username == d["username"]) | (User.email == d["email"])).first()
-            if not u:
-                u = User(
-                    username=d["username"],
-                    email=d["email"],
-                    hashed_password=hash_password("Docente123"),
-                    role=RoleEnum.teacher,
-                    is_active=True
-                )
-                db.add(u)
-                db.flush()
-            docentes_creados.append(u)
-
-        # 3. Materias base si la tabla está vacía
-        if db.query(Materia).count() == 0:
-            materias_base = [
-                {"codigo": "ISW-101", "nombre": "Fundamentos de Programación", "creditos": 4, "carrera": "ISW", "nivel": 1, "tipo": "exclusiva"},
-                {"codigo": "ISW-201", "nombre": "Estructuras de Datos y Algoritmos", "creditos": 4, "carrera": "ISW", "nivel": 2, "tipo": "exclusiva"},
-                {"codigo": "MED-101", "nombre": "Anatomía Humana General", "creditos": 4, "carrera": "MED", "nivel": 1, "tipo": "exclusiva"},
-                {"codigo": "DER-101", "nombre": "Introducción al Derecho", "creditos": 3, "carrera": "DER", "nivel": 1, "tipo": "exclusiva"},
-                {"codigo": "GEN-101", "nombre": "Ética y Ciudadanía", "creditos": 2, "carrera": "ISW", "nivel": 1, "tipo": "compartida"}
-            ]
-            for mb in materias_base:
-                m = Materia(**mb)
-                db.add(m)
-                db.flush()
-                # Grupo inicial G1 asignado al primer docente
-                docente_asignado = docentes_creados[0] if docentes_creados else None
-                g = Grupo(
-                    codigo_grupo="G1",
-                    materia_id=m.id,
-                    profesor_id=docente_asignado.id if docente_asignado else None,
-                    cupo_maximo=15
-                )
-                db.add(g)
-
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        print(f"[ERROR INICIALIZACIÓN ORM]: {e}")
+            db.commit()
     finally:
         db.close()
 
-asegurar_datos_iniciales_academicos()
+asegurar_admin_mbsystem()
 
 # =============================================================================
 # EXPORTACIÓN GLOBAL DE LA INSTANCIA 'app' DE FLASK PARA GUNICORN / WSGI
@@ -131,13 +207,14 @@ ESCALA_MAXIMA_NOTA: float = 5.0
 # =============================================================================
 # GESTIÓN DE CONEXIÓN A BASE DE DATOS MEDIANTE FLASK 'g' CONTEXT
 # =============================================================================
-def get_db() -> DBConnection:
+def get_db() -> sqlite3.Connection:
     """
-    Obtiene la conexión a la base de datos (PostgreSQL en producción o SQLite local)
-    para la petición HTTP actual usando el contexto Flask 'g'.
+    Obtiene la conexión a la base de datos SQLite para la petición HTTP actual.
+    Si la conexión no existe aún en 'g', la crea y almacena.
     """
     if 'db' not in g:
-        g.db = get_raw_connection()
+        g.db = sqlite3.connect("universidad.db")
+        g.db.row_factory = sqlite3.Row
     return g.db
 
 
@@ -258,11 +335,7 @@ def admin_dashboard():
     """Vista exclusiva para Administrador (Rector)."""
     if session.get("role") != "admin":
         return redirect(url_for("login_view"))
-    sqla_db = get_sqlalchemy_db()
-    materias = sqla_db.query(Materia).order_by(Materia.nivel.asc(), Materia.codigo.asc()).all()
-    grupos = sqla_db.query(Grupo).join(Materia).order_by(Materia.codigo.asc(), Grupo.codigo_grupo.asc()).all()
-    profesores = sqla_db.query(User).filter(User.role == RoleEnum.teacher, User.is_active == True).order_by(User.username.asc()).all()
-    return render_template("admin.html", materias=materias, grupos=grupos, profesores=profesores)
+    return render_template("admin.html")
 
 
 @app.route("/teacher")
@@ -606,65 +679,15 @@ def obtener_carreras() -> Tuple[Response, int]:
     return respuesta_exito(carreras)
 
 
-# =============================================================================
-# MÓDULO DE GESTIÓN ACADÉMICA: MATERIAS, PROFESORES, GRUPOS Y HORARIOS
-# =============================================================================
-
-@app.route("/api/sistema/estado", methods=["GET"])
-def obtener_estado_sistema() -> Tuple[Response, int]:
-    """Retorna el estado del motor de base de datos para la interfaz de administración."""
-    motor = "PostgreSQL (Persistente en Render)" if settings.is_postgres else "SQLite (Local)"
-    return respuesta_exito({
-        "status": "ok",
-        "is_postgres": settings.is_postgres,
-        "motor": motor,
-        "timestamp": datetime.now().isoformat()
-    })
-
-
-@app.route("/api/profesores", methods=["GET"])
-def obtener_profesores() -> Tuple[Response, int]:
-    """Retorna el listado de docentes activos para asignación de grupos usando SQLAlchemy ORM."""
-    carrera_id = request.args.get("carrera_id", type=str)
-    sqla_db = get_sqlalchemy_db()
-    docentes = sqla_db.query(User).filter(User.role == RoleEnum.teacher, User.is_active == True).order_by(User.username.asc()).all()
-    profesores = []
-    for d in docentes:
-        profesores.append({
-            "id": d.id,
-            "nombre": d.username,
-            "username": d.username,
-            "email": d.email,
-            "carrera_principal": "Docente Titular"
-        })
-
-    # Incluir también registros de profesores legacy (por compatibilidad con identificadores como DOC-TEST-01)
-    try:
-        db = get_db()
-        cursor = db.cursor()
-        query = "SELECT id, nombre, email, carrera_principal FROM profesores WHERE 1=1"
-        params = []
-        if carrera_id:
-            query += " AND carrera_principal = ?"
-            params.append(carrera_id)
-        query += " ORDER BY nombre ASC;"
-        cursor.execute(query, params)
-        for r in cursor.fetchall():
-            row_dict = dict(r)
-            if not any(p["id"] == row_dict["id"] for p in profesores):
-                profesores.append(row_dict)
-    except Exception:
-        pass
-
-    return respuesta_exito(profesores)
-
-
-@app.route("/api/materias", methods=["GET"])
 @app.route("/api/asignaturas", methods=["GET"])
 def obtener_asignaturas() -> Tuple[Response, int]:
     """
-    Retorna asignaturas/materias filtradas por carrera, nivel, docente, tipo o búsqueda.
-    Usa SQLAlchemy ORM y retorna el formato enriquecido para el frontend.
+    Retorna asignaturas filtradas opcionalmente por:
+    - nivel: 1, 2, 3
+    - carrera_id: ISW, MED, ADM, DER, ARQ
+    - docente: nombre exacto de docente
+    - tipo: 'exclusiva' | 'compartida'
+    - q: búsqueda por nombre o código
     """
     nivel = request.args.get("nivel", type=int)
     carrera_id = request.args.get("carrera_id", type=str)
@@ -672,337 +695,82 @@ def obtener_asignaturas() -> Tuple[Response, int]:
     tipo = request.args.get("tipo", type=str)
     q = request.args.get("q", type=str)
 
-    sqla_db = get_sqlalchemy_db()
-    query = sqla_db.query(Materia)
+    query = """
+        SELECT a.*, c.nombre as carrera_nombre 
+        FROM asignaturas a 
+        LEFT JOIN carreras c ON a.carrera_id = c.id 
+        WHERE 1=1
+    """
+    params: List[Any] = []
 
     if nivel:
-        query = query.filter(Materia.nivel == nivel)
+        query += " AND a.nivel = ?"
+        params.append(nivel)
+
     if carrera_id:
-        query = query.filter(or_(Materia.carrera == carrera_id, Materia.tipo == "compartida"))
+        query += " AND (a.carrera_id = ? OR a.carreras_compartidas LIKE ?)"
+        params.extend([carrera_id, f"%{carrera_id}%"])
+
+    if docente:
+        query += " AND a.docente = ?"
+        params.append(docente)
+
     if tipo:
-        query = query.filter(Materia.tipo == tipo)
+        query += " AND a.tipo = ?"
+        params.append(tipo)
+
     if q:
-        q_term = f"%{q.strip().lower()}%"
-        query = query.filter(or_(
-            func.lower(Materia.nombre).like(q_term),
-            func.lower(Materia.codigo).like(q_term)
-        ))
+        query += " AND (a.nombre LIKE ? OR a.codigo LIKE ? OR a.docente LIKE ?)"
+        busqueda = f"%{q.strip()}%"
+        params.extend([busqueda, busqueda, busqueda])
 
-    materias = query.order_by(Materia.nivel.asc(), Materia.codigo.asc()).all()
-    asignaturas = []
-    carrera_nombres = {
-        "ISW": "Ingeniería de Software",
-        "MED": "Medicina Humana",
-        "DER": "Derecho y C. Políticas"
-    }
+    query += " ORDER BY a.nivel ASC, a.nombre ASC;"
 
-    for m in materias:
-        d = m.to_dict()
-        d["carrera_id"] = m.carrera
-        d["carrera_nombre"] = carrera_nombres.get(m.carrera, m.carrera)
-        d["total_grupos"] = len(m.grupos)
-
-        # Docente y grupo del primer grupo si existe
-        if m.grupos and len(m.grupos) > 0:
-            primer_grupo = m.grupos[0]
-            d["grupo"] = primer_grupo.codigo_grupo
-            d["docente"] = primer_grupo.profesor.username if primer_grupo.profesor else "Por asignar"
-            if primer_grupo.horarios and len(primer_grupo.horarios) > 0:
-                h0 = primer_grupo.horarios[0]
-                d["horario"] = f"{h0.dia[:3]} {h0.hora_inicio}-{h0.hora_fin}"
-                d["aula"] = h0.aula
-            else:
-                d["horario"] = "Por definir"
-                d["aula"] = "Aula 101"
-        else:
-            d["grupo"] = "G1"
-            d["docente"] = "Por asignar"
-            d["horario"] = "Por definir"
-            d["aula"] = "Aula 101"
-
-        if docente and d["docente"] != docente:
-            continue
-
-        asignaturas.append(d)
-
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(query, params)
+    asignaturas = [dict(row) for row in cursor.fetchall()]
     return respuesta_exito(asignaturas)
 
 
-@app.route("/materias/crear", methods=["GET", "POST"])
-@app.route("/api/materias", methods=["POST"])
-@app.route("/api/asignaturas", methods=["POST"])
-def crear_materia():
-    """
-    Ruta para la creación y registro de nuevas materias / asignaturas usando SQLAlchemy ORM.
-    Soporta peticiones POST de formulario HTML (con redirect y flash) y JSON REST.
-    """
-    if request.method == "GET":
-        if session.get("role") != "admin":
-            return redirect(url_for("login_view"))
-        return redirect(url_for("admin_dashboard"))
-
-    datos = obtener_datos_peticion()
-    codigo = str(request.form.get("codigo") or datos.get("codigo") or "").strip().upper()
-    nombre = str(request.form.get("nombre") or datos.get("nombre") or "").strip()
-    carrera = str(request.form.get("carrera") or request.form.get("carrera_id") or datos.get("carrera") or datos.get("carrera_id") or "").strip().upper()
-
-    creditos_raw = request.form.get("creditos") or datos.get("creditos") or 3
-    try:
-        creditos = int(creditos_raw)
-    except (ValueError, TypeError):
-        creditos = 3
-
-    nivel_raw = request.form.get("nivel") or datos.get("nivel") or 1
-    try:
-        nivel = int(nivel_raw)
-    except (ValueError, TypeError):
-        nivel = 1
-
-    tipo = str(request.form.get("tipo") or datos.get("tipo") or "exclusiva").strip().lower()
-    if tipo not in ("exclusiva", "compartida"):
-        tipo = "exclusiva"
-
-    es_api = request.is_json or request.headers.get("Accept") == "application/json" or request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.path.startswith("/api/")
-
-    if not codigo or not nombre or not carrera:
-        error_msg = "El código, el nombre y la carrera profesional son campos obligatorios."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    if nivel not in (1, 2, 3):
-        error_msg = "El nivel curricular debe ser 1 (Fundamentos), 2 (Intermedio) o 3 (Avanzado)."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    sqla_db = get_sqlalchemy_db()
-
-    # Validación de unicidad en SQLAlchemy
-    existente = sqla_db.query(Materia).filter(
-        or_(func.upper(Materia.codigo) == codigo, func.lower(Materia.nombre) == nombre.lower())
-    ).first()
-    if existente:
-        if existente.codigo.upper() == codigo:
-            error_msg = f"Ya existe una asignatura registrada con el código '{codigo}'."
-        else:
-            error_msg = f"Ya existe una asignatura registrada con el nombre '{nombre}'."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    try:
-        nueva_materia = Materia(
-            codigo=codigo,
-            nombre=nombre,
-            creditos=creditos,
-            carrera=carrera,
-            nivel=nivel,
-            tipo=tipo
-        )
-        sqla_db.add(nueva_materia)
-        sqla_db.commit()
-        sqla_db.refresh(nueva_materia)
-
-        # Sincronización transparente con base de datos de respaldo
-        try:
-            db_raw = get_db()
-            cursor_raw = db_raw.cursor()
-            cursor_raw.execute("""
-                INSERT OR IGNORE INTO asignaturas (
-                    id, codigo, nombre, creditos, nivel, tipo, carrera_id, docente, horario, grupo, aula
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Por asignar', 'Por definir', 'G1', 'Aula 101');
-            """, (f"MAT-{codigo}", codigo, nombre, creditos, nivel, tipo, carrera))
-            if hasattr(db_raw, "commit"):
-                db_raw.commit()
-        except Exception:
-            pass
-
-        if not es_api:
-            flash(f"Asignatura '{nombre}' ({codigo}) creada y guardada exitosamente.", "success")
-            return redirect(url_for("admin_dashboard"))
-
-        res_dict = nueva_materia.to_dict()
-        res_dict["carrera_id"] = carrera
-        res_dict["mensaje"] = f"Materia '{nombre}' ({codigo}) creada exitosamente."
-        return respuesta_exito(res_dict, 201)
-
-    except Exception as e:
-        sqla_db.rollback()
-        error_msg = f"Error al guardar la materia: {str(e)}"
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 500)
-
-
-@app.route("/api/materias/<string:id>", methods=["PUT"])
-@app.route("/api/asignaturas/<string:id>", methods=["PUT"])
-def editar_materia(id: str) -> Tuple[Response, int]:
-    """Actualiza una materia existente usando SQLAlchemy ORM."""
-    datos = obtener_datos_peticion()
-    nombre = str(datos.get("nombre", "")).strip()
-    carrera = str(datos.get("carrera") or datos.get("carrera_id") or "").strip().upper()
-    creditos = int(datos.get("creditos") or 3)
-    nivel = int(datos.get("nivel") or 1)
-    tipo = str(datos.get("tipo", "exclusiva")).strip().lower()
-
-    if not nombre or not carrera:
-        return respuesta_error("El nombre y la carrera son campos obligatorios.", 400)
-
-    sqla_db = get_sqlalchemy_db()
-    materia = None
-    try:
-        materia = sqla_db.query(Materia).filter(Materia.id == int(id)).first()
-    except (ValueError, TypeError):
-        pass
-
-    if not materia:
-        cod_clean = id.replace("MAT-", "").strip().upper()
-        materia = sqla_db.query(Materia).filter(
-            or_(func.upper(Materia.codigo) == cod_clean, func.upper(Materia.codigo) == id.strip().upper())
-        ).first()
-
-    if not materia:
-        return respuesta_error("Materia no encontrada.", 404)
-
-    try:
-        materia.nombre = nombre
-        materia.carrera = carrera
-        materia.creditos = creditos
-        materia.nivel = nivel
-        materia.tipo = tipo
-        sqla_db.commit()
-
-        # Sincronización legacy
-        try:
-            db_raw = get_db()
-            cursor_raw = db_raw.cursor()
-            cursor_raw.execute("""
-                UPDATE asignaturas SET nombre = ?, carrera_id = ?, creditos = ?, nivel = ?, tipo = ?
-                WHERE id = ? OR codigo = ?;
-            """, (nombre, carrera, creditos, nivel, tipo, id, materia.codigo))
-            if hasattr(db_raw, "commit"):
-                db_raw.commit()
-        except Exception:
-            pass
-
-        return respuesta_exito({"mensaje": f"Materia '{nombre}' actualizada exitosamente.", "id": materia.id})
-    except Exception as e:
-        sqla_db.rollback()
-        return respuesta_error(f"Error al actualizar materia: {str(e)}", 400)
-
-
-@app.route("/api/materias/<string:id>", methods=["DELETE"])
-@app.route("/api/asignaturas/<string:id>", methods=["DELETE"])
-def eliminar_materia(id: str) -> Tuple[Response, int]:
-    """Elimina una materia y sus grupos/horarios asociados usando SQLAlchemy ORM."""
-    sqla_db = get_sqlalchemy_db()
-    materia = None
-    try:
-        materia = sqla_db.query(Materia).filter(Materia.id == int(id)).first()
-    except (ValueError, TypeError):
-        pass
-
-    if not materia:
-        cod_clean = id.replace("MAT-", "").strip().upper()
-        materia = sqla_db.query(Materia).filter(
-            or_(func.upper(Materia.codigo) == cod_clean, func.upper(Materia.codigo) == id.strip().upper())
-        ).first()
-
-    if not materia:
-        return respuesta_error("Materia no encontrada.", 404)
-
-    try:
-        nombre = materia.nombre
-        sqla_db.delete(materia)
-        sqla_db.commit()
-
-        # Sincronización legacy
-        try:
-            db_raw = get_db()
-            cursor_raw = db_raw.cursor()
-            cursor_raw.execute("DELETE FROM asignaturas WHERE id = ? OR codigo = ?;", (id, id))
-            if hasattr(db_raw, "commit"):
-                db_raw.commit()
-        except Exception:
-            pass
-
-        return respuesta_exito({"mensaje": f"Materia '{nombre}' eliminada correctamente."})
-    except Exception as e:
-        sqla_db.rollback()
-        return respuesta_error(f"Error al eliminar materia: {str(e)}", 400)
-
-
-# =============================================================================
-# GESTIÓN DE GRUPOS ACADÉMICOS (SQLAlchemy ORM)
-# =============================================================================
-
-@app.route("/api/grupos-academicos", methods=["GET"])
 @app.route("/api/grupos", methods=["GET"])
-def obtener_grupos_academicos() -> Tuple[Response, int]:
+def obtener_grupos_estudio() -> Tuple[Response, int]:
     """
-    Retorna la nómina de grupos académicos con su materia, profesor asignado,
-    cupos y bloques de horarios configurados usando SQLAlchemy ORM.
+    Retorna la lista de grupos académicos de estudio organizados por Carrera, Semestres y Nivel.
+    Garantiza el límite de máximo 15 estudiantes por aula/sección.
     """
     carrera_id = request.args.get("carrera_id", type=str)
-    asignatura_id = request.args.get("asignatura_id", type=str)
     grupo_filtro = request.args.get("grupo", type=str)
 
-    sqla_db = get_sqlalchemy_db()
-    query = sqla_db.query(Grupo).join(Materia)
+    db = get_db()
+    cursor = db.cursor()
+
+    query = """
+        SELECT a.id as asignatura_id, a.codigo, a.nombre as asignatura_nombre, a.nivel, a.tipo,
+               a.carrera_id, a.carreras_compartidas, a.docente, a.horario, a.grupo, a.aula,
+               COUNT(i.estudiante_id) as inscritos
+        FROM asignaturas a
+        LEFT JOIN inscripciones i ON a.id = i.asignatura_id
+        WHERE 1=1
+    """
+    params: List[Any] = []
 
     if carrera_id:
-        query = query.filter(or_(Materia.carrera == carrera_id, Materia.tipo == "compartida"))
-    if asignatura_id:
-        try:
-            asg_int = int(asignatura_id)
-            query = query.filter(or_(Grupo.materia_id == asg_int, func.upper(Materia.codigo) == asignatura_id.upper()))
-        except (ValueError, TypeError):
-            clean_code = asignatura_id.replace("MAT-", "").strip().upper()
-            query = query.filter(func.upper(Materia.codigo) == clean_code)
+        query += " AND (a.carrera_id = ? OR a.carreras_compartidas LIKE ?)"
+        params.extend([carrera_id, f"%{carrera_id}%"])
+
     if grupo_filtro:
-        query = query.filter(func.upper(Grupo.codigo_grupo) == grupo_filtro.strip().upper())
+        query += " AND a.grupo = ?"
+        params.append(grupo_filtro)
 
-    grupos = query.order_by(Materia.nivel.asc(), Materia.codigo.asc(), Grupo.codigo_grupo.asc()).all()
+    query += " GROUP BY a.id ORDER BY a.nivel ASC, a.codigo ASC;"
 
-    carrera_nombres = {
-        "ISW": "Ingeniería de Software",
-        "MED": "Medicina Humana",
-        "DER": "Derecho y C. Políticas"
-    }
-
-    carrera_colores = {
-        "ISW": "#3b82f6",
-        "MED": "#10b981",
-        "DER": "#8b5cf6"
-    }
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
 
     grupos_resultado = []
-    for g in grupos:
-        m = g.materia
-        p = g.profesor
-        horarios_list = []
-        for h in g.horarios:
-            horarios_list.append({
-                "id": h.id,
-                "dia_semana": h.dia,
-                "dia": h.dia,
-                "hora_inicio": h.hora_inicio,
-                "hora_fin": h.hora_fin,
-                "aula": h.aula,
-                "edificio": h.edificio
-            })
-
-        horario_txt = " | ".join([f"{h['dia'][:3]} {h['hora_inicio']}-{h['hora_fin']}" for h in horarios_list]) if horarios_list else "Por definir"
-        aula_txt = horarios_list[0]["aula"] if horarios_list else "Aula 101"
-        capacidad = g.cupo_maximo or 15
-        inscritos = 0
-
-        nivel = m.nivel if m else 1
+    for r in rows:
+        nivel = r["nivel"]
         if nivel == 1:
             semestres_txt = "1º y 2º Semestre (Fundamentos)"
         elif nivel == 2:
@@ -1010,530 +778,30 @@ def obtener_grupos_academicos() -> Tuple[Response, int]:
         elif nivel == 3:
             semestres_txt = "6º a 8º Semestre (Avanzado)"
         else:
-            semestres_txt = "9º y 10º Semestre"
-
+            semestres_txt = "9º y 10º Semestre (Especialización/Internado)"
+        inscritos = r["inscritos"]
+        capacidad_max = 10 if r["tipo"] == "exclusiva" else 15
+        
         grupos_resultado.append({
-            "id": g.id,
-            "codigo_seccion": f"SEC-{m.codigo if m else ''}-{g.codigo_grupo}",
-            "grupo": g.codigo_grupo,
-            "nombre": m.nombre if m else "Asignatura",
-            "asignatura_id": m.id if m else None,
-            "codigo": m.codigo if m else "",
-            "materia_nombre": m.nombre if m else "",
+            "codigo_seccion": f"SEC-{r['codigo']}-{r['grupo']}",
+            "asignatura_id": r["asignatura_id"],
+            "codigo": r["codigo"],
+            "nombre": r["asignatura_nombre"],
             "nivel": nivel,
             "semestres_destino": semestres_txt,
-            "tipo": m.tipo if m else "exclusiva",
-            "carrera_id": m.carrera if m else "COMPARTIDA",
-            "carrera_nombre": carrera_nombres.get(m.carrera, m.carrera) if m else "General",
-            "carrera_color": carrera_colores.get(m.carrera, "#3b82f6") if m else "#3b82f6",
-            "profesor_id": g.profesor_id,
-            "profesor_nombre": p.username if p else "Sin asignar",
-            "docente": p.username if p else "Sin asignar",
-            "horario": horario_txt,
-            "horarios": horarios_list,
-            "aula": aula_txt,
-            "capacidad_aula": capacidad,
+            "tipo": r["tipo"],
+            "carrera_id": r["carrera_id"] or "COMPARTIDA",
+            "docente": r["docente"],
+            "horario": r["horario"],
+            "grupo": r["grupo"],
+            "aula": r["aula"],
+            "capacidad_aula": capacidad_max,
             "inscritos": inscritos,
-            "cupos_libres": max(0, capacidad - inscritos),
-            "estado_aula": f"{inscritos}/{capacidad} Ocupados"
+            "cupos_libres": max(0, capacidad_max - inscritos),
+            "estado_aula": f"{capacidad_max}/{capacidad_max} Llena" if inscritos >= capacidad_max else f"{inscritos}/{capacidad_max} Ocupados"
         })
 
     return respuesta_exito(grupos_resultado)
-
-
-@app.route("/grupos/crear", methods=["GET", "POST"])
-@app.route("/api/grupos", methods=["POST"])
-def crear_grupo() -> Tuple[Response, int]:
-    """
-    Ruta para la creación y registro de nuevos grupos académicos usando SQLAlchemy ORM.
-    Asigna una sección (ej. G1, G2) a una materia y vincula al docente responsable.
-    """
-    if request.method == "GET":
-        if session.get("role") != "admin":
-            return redirect(url_for("login_view"))
-        return redirect(url_for("admin_dashboard"))
-
-    datos = obtener_datos_peticion()
-    materia_id_raw = request.form.get("materia_id") or datos.get("materia_id") or datos.get("asignatura_id")
-    codigo_grupo = str(request.form.get("codigo_grupo") or datos.get("codigo_grupo") or datos.get("nombre") or "").strip().upper()
-    profesor_id_raw = request.form.get("profesor_id") or datos.get("profesor_id")
-    cupo_raw = request.form.get("cupo_maximo") or datos.get("cupo_maximo") or 15
-
-    es_api = request.is_json or request.headers.get("Accept") == "application/json" or request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.path.startswith("/api/")
-
-    if not materia_id_raw or not codigo_grupo:
-        error_msg = "La materia/asignatura y el código de grupo (ej. G1, G2) son obligatorios."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    try:
-        cupo_maximo = int(cupo_raw)
-    except (ValueError, TypeError):
-        cupo_maximo = 15
-
-    profesor_id = None
-    if profesor_id_raw:
-        try:
-            profesor_id = int(profesor_id_raw)
-        except (ValueError, TypeError):
-            profesor_id = None
-
-    sqla_db = get_sqlalchemy_db()
-
-    # Buscar materia (por id entero o por código)
-    materia = None
-    try:
-        m_id_int = int(materia_id_raw)
-        materia = sqla_db.query(Materia).filter(Materia.id == m_id_int).first()
-    except (ValueError, TypeError):
-        pass
-
-    if not materia:
-        cod_clean = str(materia_id_raw).replace("MAT-", "").strip().upper()
-        materia = sqla_db.query(Materia).filter(
-            or_(func.upper(Materia.codigo) == cod_clean, func.upper(Materia.codigo) == str(materia_id_raw).strip().upper())
-        ).first()
-
-    if not materia:
-        error_msg = f"La materia especificada ({materia_id_raw}) no existe en la base de datos."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 404)
-
-    # Validar unicidad del grupo para esta materia
-    grupo_existente = sqla_db.query(Grupo).filter(
-        Grupo.materia_id == materia.id,
-        func.upper(Grupo.codigo_grupo) == codigo_grupo
-    ).first()
-    if grupo_existente:
-        error_msg = f"Ya existe el grupo '{codigo_grupo}' para la asignatura '{materia.nombre}'."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    profesor = None
-    if profesor_id:
-        profesor = sqla_db.query(User).filter(User.id == profesor_id).first()
-    elif profesor_id_raw:
-        prof_str = str(profesor_id_raw).strip()
-        profesor = sqla_db.query(User).filter(
-            or_(User.username == prof_str, User.email == prof_str)
-        ).first()
-        if not profesor:
-            try:
-                db_raw = get_db()
-                c_p = db_raw.cursor()
-                c_p.execute("SELECT nombre, email FROM profesores WHERE id = ?;", (prof_str,))
-                p_legacy = c_p.fetchone()
-                if p_legacy:
-                    profesor = sqla_db.query(User).filter(
-                        or_(User.username == p_legacy["nombre"], User.email == p_legacy["email"])
-                    ).first()
-                    if not profesor:
-                        profesor = User(
-                            username=p_legacy["nombre"],
-                            email=p_legacy["email"],
-                            hashed_password=hash_password("Docente123"),
-                            role=RoleEnum.teacher,
-                            is_active=True
-                        )
-                        sqla_db.add(profesor)
-                        sqla_db.commit()
-                        sqla_db.refresh(profesor)
-            except Exception:
-                pass
-
-    try:
-        nuevo_grupo = Grupo(
-            codigo_grupo=codigo_grupo,
-            materia_id=materia.id,
-            profesor_id=profesor.id if profesor else None,
-            cupo_maximo=cupo_maximo
-        )
-        sqla_db.add(nuevo_grupo)
-        sqla_db.commit()
-        sqla_db.refresh(nuevo_grupo)
-
-        # Sincronización legacy
-        try:
-            db_raw = get_db()
-            cur_raw = db_raw.cursor()
-            grp_id_str = f"GRP-{materia.codigo}-{codigo_grupo}"
-            cur_raw.execute("""
-                INSERT OR REPLACE INTO grupos (id, nombre, asignatura_id, profesor_id, cupo_maximo, periodo, estado)
-                VALUES (?, ?, ?, ?, ?, '2026-1', 'Activo');
-            """, (grp_id_str, codigo_grupo, f"MAT-{materia.codigo}", profesor.id if profesor else None, cupo_maximo))
-            if hasattr(db_raw, "commit"):
-                db_raw.commit()
-        except Exception:
-            pass
-
-        if not es_api:
-            flash(f"Grupo '{codigo_grupo}' creado y guardado exitosamente para '{materia.nombre}'.", "success")
-            return redirect(url_for("admin_dashboard"))
-
-        res = nuevo_grupo.to_dict()
-        res["id"] = nuevo_grupo.id
-        res["nombre"] = codigo_grupo
-        res["codigo"] = codigo_grupo
-        res["asignatura_id"] = materia.id
-        res["materia_id"] = materia.id
-        res["profesor_id"] = profesor.id if profesor else None
-        res["profesor_nombre"] = profesor.username if profesor else "Sin asignar"
-        res["mensaje"] = f"Grupo '{codigo_grupo}' creado exitosamente para '{materia.nombre}'."
-        return respuesta_exito(res, 201)
-
-    except Exception as e:
-        sqla_db.rollback()
-        error_msg = f"Error al crear grupo: {str(e)}"
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 500)
-
-
-@app.route("/api/grupos/<string:id>", methods=["PUT"])
-def editar_grupo(id: str) -> Tuple[Response, int]:
-    """Actualiza datos de un grupo (profesor asignado, cupo máximo) usando SQLAlchemy ORM."""
-    datos = obtener_datos_peticion()
-    profesor_id = datos.get("profesor_id")
-    cupo_maximo = int(datos.get("cupo_maximo") or 15)
-
-    sqla_db = get_sqlalchemy_db()
-    grupo = None
-    try:
-        grupo = sqla_db.query(Grupo).filter(Grupo.id == int(id)).first()
-    except (ValueError, TypeError):
-        pass
-
-    if not grupo:
-        return respuesta_error("Grupo no encontrado.", 404)
-
-    try:
-        if profesor_id:
-            try:
-                grupo.profesor_id = int(profesor_id)
-            except (ValueError, TypeError):
-                pass
-        else:
-            grupo.profesor_id = None
-        grupo.cupo_maximo = cupo_maximo
-        sqla_db.commit()
-        return respuesta_exito({"mensaje": f"Grupo '{grupo.codigo_grupo}' actualizado exitosamente."})
-    except Exception as e:
-        sqla_db.rollback()
-        return respuesta_error(f"Error al actualizar grupo: {str(e)}", 400)
-
-
-@app.route("/api/grupos/<string:id>", methods=["DELETE"])
-def eliminar_grupo(id: str) -> Tuple[Response, int]:
-    """Elimina un grupo y sus horarios asignados usando SQLAlchemy ORM."""
-    sqla_db = get_sqlalchemy_db()
-    grupo = None
-    try:
-        grupo = sqla_db.query(Grupo).filter(Grupo.id == int(id)).first()
-    except (ValueError, TypeError):
-        pass
-
-    if not grupo:
-        parts = id.split("-")
-        if len(parts) >= 3:
-            grp_code = parts[-1]
-            mat_code = "-".join(parts[1:-1])
-            grupo = sqla_db.query(Grupo).join(Materia).filter(
-                func.upper(Materia.codigo) == mat_code.upper(),
-                func.upper(Grupo.codigo_grupo) == grp_code.upper()
-            ).first()
-
-    if not grupo:
-        grupo = sqla_db.query(Grupo).filter(func.upper(Grupo.codigo_grupo) == id.upper()).first()
-
-    if not grupo:
-        return respuesta_error("Grupo no encontrado.", 404)
-
-    try:
-        nombre = grupo.codigo_grupo
-        sqla_db.delete(grupo)
-        sqla_db.commit()
-        return respuesta_exito({"mensaje": f"Grupo '{nombre}' eliminado correctamente."})
-    except Exception as e:
-        sqla_db.rollback()
-        return respuesta_error(f"Error al eliminar grupo: {str(e)}", 400)
-
-
-# =============================================================================
-# GESTIÓN DE HORARIOS CON VALIDACIÓN ESTRICTA ANTI-CRUCES (SQLAlchemy ORM)
-# =============================================================================
-
-@app.route("/api/horarios", methods=["GET"])
-def obtener_horarios() -> Tuple[Response, int]:
-    """
-    Retorna la totalidad de horarios asignados a grupos con detalles de materia,
-    profesor y aula para la matriz semanal de administración.
-    """
-    carrera_id = request.args.get("carrera_id", type=str)
-    dia_semana = request.args.get("dia_semana", type=str)
-
-    sqla_db = get_sqlalchemy_db()
-    query = sqla_db.query(Horario).join(Grupo).join(Materia)
-
-    if carrera_id:
-        query = query.filter(or_(Materia.carrera == carrera_id, Materia.tipo == "compartida"))
-
-    if dia_semana:
-        query = query.filter(Horario.dia == dia_semana)
-
-    horarios = query.all()
-
-    carrera_nombres = {
-        "ISW": "Ingeniería de Software",
-        "MED": "Medicina Humana",
-        "DER": "Derecho y C. Políticas"
-    }
-    carrera_colores = {
-        "ISW": "#3b82f6",
-        "MED": "#10b981",
-        "DER": "#8b5cf6"
-    }
-
-    horarios_resultado = []
-    for h in horarios:
-        g = h.grupo
-        m = g.materia if g else None
-        p = g.profesor if g else None
-
-        horarios_resultado.append({
-            "id": h.id,
-            "grupo_id": h.grupo_id,
-            "dia_semana": h.dia,
-            "dia": h.dia,
-            "hora_inicio": h.hora_inicio,
-            "hora_fin": h.hora_fin,
-            "aula": h.aula,
-            "edificio": h.edificio,
-            "grupo_nombre": g.codigo_grupo if g else "",
-            "profesor_id": g.profesor_id if g else None,
-            "asignatura_id": m.id if m else None,
-            "materia_codigo": m.codigo if m else "",
-            "materia_nombre": m.nombre if m else "",
-            "nivel": m.nivel if m else 1,
-            "carrera_id": m.carrera if m else "",
-            "carrera_nombre": carrera_nombres.get(m.carrera, m.carrera) if m else "",
-            "carrera_color": carrera_colores.get(m.carrera, "#3b82f6") if m else "#3b82f6",
-            "profesor_nombre": p.username if p else "Docente sin asignar",
-            "profesor_email": p.email if p else ""
-        })
-
-    return respuesta_exito(horarios_resultado)
-
-
-@app.route("/horarios/crear", methods=["GET", "POST"])
-@app.route("/api/horarios", methods=["POST"])
-def crear_horario() -> Tuple[Response, int]:
-    """
-    Asigna un bloque de horario a un grupo validando que NO existan cruces
-    de horario para el docente asignado ni para el aula física en la misma franja y día.
-    """
-    if request.method == "GET":
-        if session.get("role") != "admin":
-            return redirect(url_for("login_view"))
-        return redirect(url_for("admin_dashboard"))
-
-    datos = obtener_datos_peticion()
-    grupo_id_raw = request.form.get("grupo_id") or datos.get("grupo_id")
-    dia = str(request.form.get("dia") or request.form.get("dia_semana") or datos.get("dia") or datos.get("dia_semana") or "").strip()
-    hora_inicio = str(request.form.get("hora_inicio") or datos.get("hora_inicio") or "").strip()
-    hora_fin = str(request.form.get("hora_fin") or datos.get("hora_fin") or "").strip()
-    aula = str(request.form.get("aula") or datos.get("aula") or "").strip()
-    edificio = str(request.form.get("edificio") or datos.get("edificio") or "Edificio Central").strip()
-
-    es_api = request.is_json or request.headers.get("Accept") == "application/json" or request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.path.startswith("/api/")
-
-    if not grupo_id_raw or not dia or not hora_inicio or not hora_fin or not aula:
-        error_msg = "Todos los campos (grupo, día, hora inicio, hora fin y aula) son requeridos."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    dias_validos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
-    if dia not in dias_validos:
-        error_msg = f"Día inválido. Debe ser uno de: {', '.join(dias_validos)}."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    if hora_inicio >= hora_fin:
-        error_msg = "La hora de inicio debe ser anterior a la hora de finalización."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 400)
-
-    sqla_db = get_sqlalchemy_db()
-
-    # Buscar grupo por id entero o por patrón GRP-CODIGO-NOMBRE
-    grupo = None
-    try:
-        g_id_int = int(grupo_id_raw)
-        grupo = sqla_db.query(Grupo).filter(Grupo.id == g_id_int).first()
-    except (ValueError, TypeError):
-        pass
-
-    if not grupo:
-        parts = str(grupo_id_raw).split("-")
-        if len(parts) >= 3:
-            grp_code = parts[-1]
-            mat_code = "-".join(parts[1:-1])
-            grupo = sqla_db.query(Grupo).join(Materia).filter(
-                func.upper(Materia.codigo) == mat_code.upper(),
-                func.upper(Grupo.codigo_grupo) == grp_code.upper()
-            ).first()
-
-    if not grupo:
-        grupo = sqla_db.query(Grupo).filter(func.upper(Grupo.codigo_grupo) == str(grupo_id_raw).upper()).first()
-
-    if not grupo:
-        error_msg = "El grupo académico especificado no existe en la base de datos."
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 404)
-
-    # 1. VALIDACIÓN RIGUROSA: CRUCE DE HORARIO DE DOCENTE
-    if grupo.profesor_id:
-        horarios_docente = (
-            sqla_db.query(Horario)
-            .join(Grupo)
-            .filter(
-                Grupo.profesor_id == grupo.profesor_id,
-                Horario.dia == dia
-            )
-            .all()
-        )
-        for h in horarios_docente:
-            if h.hora_inicio < hora_fin and h.hora_fin > hora_inicio:
-                prof_nombre = grupo.profesor.username if grupo.profesor else "el docente"
-                mat_nom = h.grupo.materia.nombre if (h.grupo and h.grupo.materia) else "otra materia"
-                grp_cod = h.grupo.codigo_grupo if h.grupo else ""
-                error_msg = (
-                    f"¡Conflicto de Docente! El profesor {prof_nombre} ya tiene clase programada "
-                    f"el {dia} de {h.hora_inicio} a {h.hora_fin} en la materia '{mat_nom}' "
-                    f"(Grupo {grp_cod}, Aula: {h.aula})."
-                )
-                if not es_api:
-                    flash(error_msg, "danger")
-                    return redirect(url_for("admin_dashboard"))
-                return respuesta_error(error_msg, 400)
-
-    # 2. VALIDACIÓN RIGUROSA: CRUCE DE HORARIO DE AULA FÍSICA
-    horarios_aula = (
-        sqla_db.query(Horario)
-        .filter(
-            func.lower(Horario.aula) == func.lower(aula),
-            Horario.dia == dia
-        )
-        .all()
-    )
-    for h in horarios_aula:
-        if h.hora_inicio < hora_fin and h.hora_fin > hora_inicio:
-            mat_nom = h.grupo.materia.nombre if (h.grupo and h.grupo.materia) else "otra materia"
-            grp_cod = h.grupo.codigo_grupo if h.grupo else ""
-            doc_info = f" (Prof. {h.grupo.profesor.username})" if (h.grupo and h.grupo.profesor) else ""
-            error_msg = (
-                f"¡Conflicto de Aula! El aula '{aula}' ya se encuentra ocupada "
-                f"el {dia} de {h.hora_inicio} a {h.hora_fin} por la asignatura '{mat_nom}' "
-                f"(Grupo {grp_cod}{doc_info})."
-            )
-            if not es_api:
-                flash(error_msg, "danger")
-                return redirect(url_for("admin_dashboard"))
-            return respuesta_error(error_msg, 400)
-
-    # 3. GUARDAR EL HORARIO EN POSTGRESQL / SQLALCHEMY ORM
-    try:
-        nuevo_horario = Horario(
-            grupo_id=grupo.id,
-            dia=dia,
-            hora_inicio=hora_inicio,
-            hora_fin=hora_fin,
-            aula=aula,
-            edificio=edificio
-        )
-        sqla_db.add(nuevo_horario)
-        sqla_db.commit()
-        sqla_db.refresh(nuevo_horario)
-
-        # Sincronización legacy
-        try:
-            db_raw = get_db()
-            cur_raw = db_raw.cursor()
-            grp_str_id = f"GRP-{grupo.materia.codigo if grupo.materia else ''}-{grupo.codigo_grupo}"
-            cur_raw.execute("""
-                INSERT INTO horarios (grupo_id, dia_semana, hora_inicio, hora_fin, aula, edificio)
-                VALUES (?, ?, ?, ?, ?, ?);
-            """, (grp_str_id, dia, hora_inicio, hora_fin, aula, edificio))
-            if hasattr(db_raw, "commit"):
-                db_raw.commit()
-        except Exception:
-            pass
-
-        if not es_api:
-            flash(f"Horario confirmado: {dia} de {hora_inicio} a {hora_fin} en {aula}.", "success")
-            return redirect(url_for("admin_dashboard"))
-
-        h_dict = nuevo_horario.to_dict()
-        h_dict["mensaje"] = f"Horario asignado exitosamente al Grupo {grupo.codigo_grupo}."
-        h_dict["id"] = nuevo_horario.id
-        return respuesta_exito(h_dict, 201)
-
-    except Exception as e:
-        sqla_db.rollback()
-        error_msg = f"Error al registrar horario: {str(e)}"
-        if not es_api:
-            flash(error_msg, "danger")
-            return redirect(url_for("admin_dashboard"))
-        return respuesta_error(error_msg, 500)
-
-
-@app.route("/api/horarios/<int:id>", methods=["DELETE"])
-@app.route("/api/horarios/<string:id>", methods=["DELETE"])
-def eliminar_horario(id) -> Tuple[Response, int]:
-    """Elimina un bloque horario previamente asignado usando SQLAlchemy ORM."""
-    sqla_db = get_sqlalchemy_db()
-    try:
-        h_id_int = int(id)
-        horario = sqla_db.query(Horario).filter(Horario.id == h_id_int).first()
-    except (ValueError, TypeError):
-        horario = None
-
-    if not horario:
-        return respuesta_error("Horario no encontrado.", 404)
-
-    try:
-        sqla_db.delete(horario)
-        sqla_db.commit()
-
-        # Sincronización legacy
-        try:
-            db_raw = get_db()
-            cur_raw = db_raw.cursor()
-            cur_raw.execute("DELETE FROM horarios WHERE id = ?;", (id,))
-            if hasattr(db_raw, "commit"):
-                db_raw.commit()
-        except Exception:
-            pass
-
-        return respuesta_exito({"mensaje": "Horario eliminado correctamente."})
-    except Exception as e:
-        sqla_db.rollback()
-        return respuesta_error(f"Error al eliminar horario: {str(e)}", 400)
-
 
 
 @app.route("/api/estudiantes", methods=["GET"])
@@ -2152,9 +1420,33 @@ ETIQUETAS_CAMPOS = {
 
 @app.route("/api/database/tablas", methods=["GET"])
 def inspeccionar_base_datos() -> Tuple[Response, int]:
-    """Retorna el esquema y la totalidad de registros para el visor interactivo rectoral (SQLite / PostgreSQL)."""
+    """Retorna el esquema y la totalidad de registros de universidad.db para el visor interactivo rectoral."""
     db = get_db()
-    resultado = get_db_inspector_info(db, ETIQUETAS_CAMPOS)
+    cursor = db.cursor()
+    
+    nombres_tablas = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence';").fetchall()]
+    
+    resultado = {}
+    for tabla in nombres_tablas:
+        columnas_info = cursor.execute(f"PRAGMA table_info({tabla});").fetchall()
+        columnas = [col[1] for col in columnas_info]
+        registros = [dict(r) for r in cursor.execute(f"SELECT * FROM {tabla};").fetchall()]
+        
+        resultado[tabla] = {
+            "totalRegistros": len(registros),
+            "columnas": columnas,
+            "columnasDetalle": [
+                {
+                    "nombre": col[1],
+                    "etiqueta": ETIQUETAS_CAMPOS.get(col[1], col[1]),
+                    "tipo": col[2],
+                    "notnull": col[3],
+                    "pk": col[5]
+                } for col in columnas_info
+            ],
+            "muestra": registros
+        }
+        
     return respuesta_exito(resultado)
 
 
@@ -2165,7 +1457,7 @@ def insertar_registro_bd() -> Tuple[Response, int]:
     tabla = datos_json.get("tabla")
     registro = datos_json.get("registro") or {}
 
-    tablas_permitidas = ["carreras", "asignaturas", "grupos", "horarios", "estudiantes", "inscripciones", "profesores"]
+    tablas_permitidas = ["carreras", "asignaturas", "estudiantes", "inscripciones", "profesores"]
     if tabla not in tablas_permitidas:
         return respuesta_error("Tabla no permitida o inválida", 400)
 
