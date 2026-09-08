@@ -97,6 +97,20 @@
                 </div>
             </header>
 
+            <!-- MENSAJES FLASH INSTITUCIONALES -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="flash-messages-container" style="padding: 1rem 2rem 0 2rem;">
+                  {% for category, message in messages %}
+                    <div class="alert-toast alert-{{ 'success' if category == 'success' else 'error' }}" style="padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; background: {{ '#dcfce7' if category == 'success' else '#fee2e2' }}; color: {{ '#166534' if category == 'success' else '#991b1b' }}; border: 1px solid {{ '#86efac' if category == 'success' else '#fca5a5' }};">
+                      <span><strong>{{ 'Éxito: ' if category == 'success' else 'Aviso: ' }}</strong>{{ message }}</span>
+                      <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; font-weight:bold; font-size:1.1rem; color:inherit;">&times;</button>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
             <!-- VISTAS / SECCIONES DINÁMICAS -->
             <div class="content-wrapper">
                 
@@ -931,24 +945,24 @@
                 <button type="button" class="btn-close-modal" aria-label="Cerrar">&times;</button>
             </div>
 
-            <form id="form-materia">
-                <input type="hidden" id="inp-materia-id" value="">
+            <form id="form-materia" method="POST" action="{{ url_for('crear_materia') }}">
+                <input type="hidden" id="inp-materia-id" name="id" value="">
                 <div class="modal-body" style="display:flex; flex-direction:column; gap:1rem;">
                     <div class="form-row" style="display:grid; grid-template-columns:1fr 2fr; gap:1rem;">
                         <div>
                             <label for="inp-materia-codigo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Código *</label>
-                            <input type="text" id="inp-materia-codigo" required placeholder="Ej: ISW-101" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem; text-transform:uppercase;">
+                            <input type="text" id="inp-materia-codigo" name="codigo" required placeholder="Ej: ISW-101" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem; text-transform:uppercase;">
                         </div>
                         <div>
                             <label for="inp-materia-nombre" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Nombre de la Asignatura *</label>
-                            <input type="text" id="inp-materia-nombre" required placeholder="Ej: Programación Orientada a Objetos" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <input type="text" id="inp-materia-nombre" name="nombre" required placeholder="Ej: Programación Orientada a Objetos" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                         </div>
                     </div>
 
                     <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                         <div>
                             <label for="select-materia-carrera" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Carrera Profesional *</label>
-                            <select id="select-materia-carrera" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <select id="select-materia-carrera" name="carrera" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                                 <option value="ISW">Ingeniería de Software (ISW)</option>
                                 <option value="MED">Medicina Humana (MED)</option>
                                 <option value="DER">Derecho y C. Políticas (DER)</option>
@@ -956,14 +970,14 @@
                         </div>
                         <div>
                             <label for="inp-materia-creditos" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Créditos Académicos *</label>
-                            <input type="number" id="inp-materia-creditos" min="1" max="12" value="4" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <input type="number" id="inp-materia-creditos" name="creditos" min="1" max="12" value="4" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                         </div>
                     </div>
 
                     <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                         <div>
                             <label for="select-materia-nivel" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Nivel Curricular *</label>
-                            <select id="select-materia-nivel" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <select id="select-materia-nivel" name="nivel" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                                 <option value="1">Nivel 1: Fundamentos (1º-2º Semestre)</option>
                                 <option value="2">Nivel 2: Intermedio (3º-5º Semestre)</option>
                                 <option value="3">Nivel 3: Avanzado (6º-8º Semestre)</option>
@@ -971,7 +985,7 @@
                         </div>
                         <div>
                             <label for="select-materia-tipo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Tipo de Asignatura *</label>
-                            <select id="select-materia-tipo" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <select id="select-materia-tipo" name="tipo" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                                 <option value="exclusiva">Exclusiva de Carrera</option>
                                 <option value="compartida">Compartida (General)</option>
                             </select>
@@ -981,7 +995,7 @@
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Guardar Asignatura</button>
+                    <button type="submit" id="btn-guardar-materia" class="btn btn-primary"><i data-lucide="save"></i> Guardar Asignatura</button>
                 </div>
             </form>
         </div>

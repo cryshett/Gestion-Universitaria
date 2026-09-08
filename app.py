@@ -10,7 +10,7 @@ Patrones de Diseño y Buenas Prácticas Aplicados:
 4. Separación de Responsabilidades: Rutas limpias, validación de entrada e invocación modular.
 """
 
-from flask import Flask, render_template, jsonify, request, g, Response, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, g, Response, session, redirect, url_for, flash
 import sqlite3
 import os
 import uuid
@@ -639,24 +639,65 @@ def obtener_asignaturas() -> Tuple[Response, int]:
     return respuesta_exito(asignaturas)
 
 
+@app.route("/materias/crear", methods=["GET", "POST"])
 @app.route("/api/materias", methods=["POST"])
 @app.route("/api/asignaturas", methods=["POST"])
-def crear_materia() -> Tuple[Response, int]:
-    """Crea una nueva materia / asignatura académica en la base de datos."""
-    datos = obtener_datos_peticion()
-    codigo = str(datos.get("codigo", "")).strip().upper()
-    nombre = str(datos.get("nombre", "")).strip()
-    carrera_id = str(datos.get("carrera_id", "")).strip().upper()
-    creditos = int(datos.get("creditos") or 3)
-    nivel = int(datos.get("nivel") or 1)
-    tipo = str(datos.get("tipo", "exclusiva")).strip().lower()
-    carreras_compartidas = str(datos.get("carreras_compartidas", "")).strip()
+def crear_materia():
+    """
+    Ruta para la creación y registro de nuevas materias / asignaturas.
+    Soporta tanto peticiones estándar de formulario HTML (POST con redirección y flash)
+    como peticiones RESTful JSON desde clientes AJAX.
+    """
+    # 1. Manejo de método GET
+    if request.method == "GET":
+        if session.get("role") != "admin":
+            return redirect(url_for("login_view"))
+        return redirect(url_for("admin_dashboard"))
 
+    # 2. Captura robusta de parámetros (tanto de request.form como de JSON)
+    datos = obtener_datos_peticion()
+    codigo = str(request.form.get("codigo") or datos.get("codigo") or "").strip().upper()
+    nombre = str(request.form.get("nombre") or datos.get("nombre") or "").strip()
+    carrera_id = str(request.form.get("carrera") or request.form.get("carrera_id") or datos.get("carrera") or datos.get("carrera_id") or "").strip().upper()
+
+    creditos_raw = request.form.get("creditos") or datos.get("creditos") or 3
+    try:
+        creditos = int(creditos_raw)
+    except (ValueError, TypeError):
+        creditos = 3
+
+    nivel_raw = request.form.get("nivel") or datos.get("nivel") or 1
+    try:
+        nivel = int(nivel_raw)
+    except (ValueError, TypeError):
+        nivel = 1
+
+    tipo = str(request.form.get("tipo") or datos.get("tipo") or "exclusiva").strip().lower()
+    carreras_compartidas = str(request.form.get("carreras_compartidas") or datos.get("carreras_compartidas") or "").strip()
+
+    # Detectar si el cliente espera respuesta JSON o es envío de formulario web tradicional
+    es_api = request.is_json or request.headers.get("Accept") == "application/json" or request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.path.startswith("/api/")
+
+    print(f"\n[DIAGNÓSTICO MATERIAS] --- Inicio de proceso de creación de asignatura ---")
+    print(f"[DIAGNÓSTICO MATERIAS] Método: {request.method} | Path: {request.path} | Tipo cliente: {'API/JSON' if es_api else 'Formulario Web'}")
+    print(f"[DIAGNÓSTICO MATERIAS] Datos capturados: codigo='{codigo}', nombre='{nombre}', carrera='{carrera_id}', creditos={creditos}, nivel={nivel}, tipo='{tipo}'")
+
+    # 3. Validación de campos obligatorios
     if not codigo or not nombre or not carrera_id:
-        return respuesta_error("El código, el nombre y la carrera son campos obligatorios.", 400)
+        error_msg = "El código, el nombre y la carrera profesional son campos obligatorios."
+        print(f"[DIAGNÓSTICO MATERIAS] [ERROR VALIDACIÓN]: {error_msg}")
+        if not es_api:
+            flash(error_msg, "danger")
+            return redirect(url_for("admin_dashboard"))
+        return respuesta_error(error_msg, 400)
 
     if nivel not in (1, 2, 3):
-        return respuesta_error("El nivel curricular debe ser 1 (Fundamentos), 2 (Intermedio) o 3 (Avanzado).", 400)
+        error_msg = "El nivel curricular debe ser 1 (Fundamentos), 2 (Intermedio) o 3 (Avanzado)."
+        print(f"[DIAGNÓSTICO MATERIAS] [ERROR VALIDACIÓN]: {error_msg}")
+        if not es_api:
+            flash(error_msg, "danger")
+            return redirect(url_for("admin_dashboard"))
+        return respuesta_error(error_msg, 400)
 
     if tipo not in ("exclusiva", "compartida"):
         tipo = "exclusiva"
@@ -664,12 +705,27 @@ def crear_materia() -> Tuple[Response, int]:
     db = get_db()
     cursor = db.cursor()
 
-    cursor.execute("SELECT id FROM asignaturas WHERE UPPER(codigo) = ?;", (codigo,))
-    if cursor.fetchone():
-        return respuesta_error(f"Ya existe una asignatura con el código '{codigo}'.", 400)
+    # 4. Validación de unicidad: Verificar que ni el código ni el nombre de la materia existan previamente
+    cursor.execute("""
+        SELECT id, codigo, nombre FROM asignaturas 
+        WHERE UPPER(codigo) = ? OR LOWER(nombre) = LOWER(?);
+    """, (codigo, nombre))
+    existente = cursor.fetchone()
+    if existente:
+        if existente["codigo"].upper() == codigo:
+            error_msg = f"Ya existe una asignatura registrada con el código '{codigo}'."
+        else:
+            error_msg = f"Ya existe una asignatura registrada con el nombre '{nombre}' (Código existente: {existente['codigo']})."
+        
+        print(f"[DIAGNÓSTICO MATERIAS] [CONFLICTO DUPLICADO]: {error_msg}")
+        if not es_api:
+            flash(error_msg, "danger")
+            return redirect(url_for("admin_dashboard"))
+        return respuesta_error(error_msg, 400)
 
     materia_id = f"MAT-{codigo}"
 
+    # 5. Inserción en base de datos y commit explícito con manejo robusto de excepciones
     try:
         with db:
             cursor.execute("""
@@ -678,6 +734,16 @@ def crear_materia() -> Tuple[Response, int]:
                     carreras_compartidas, docente, horario, grupo, aula
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Por asignar', 'Por definir', 'G1', 'Aula 101');
             """, (materia_id, codigo, nombre, creditos, nivel, tipo, carrera_id, carreras_compartidas))
+
+            # Commit explícito de la transacción
+            if hasattr(db, "commit"):
+                db.commit()
+
+        print(f"[DIAGNÓSTICO MATERIAS] [ÉXITO]: Asignatura '{nombre}' ({codigo}) guardada exitosamente y confirmada (commit) en la base de datos con ID: {materia_id}.")
+
+        if not es_api:
+            flash(f"Asignatura '{nombre}' ({codigo}) creada y guardada exitosamente.", "success")
+            return redirect(url_for("admin_dashboard"))
 
         return respuesta_exito({
             "mensaje": f"Materia '{nombre}' ({codigo}) creada exitosamente.",
@@ -689,8 +755,16 @@ def crear_materia() -> Tuple[Response, int]:
             "nivel": nivel,
             "tipo": tipo
         }, 201)
+
     except Exception as e:
-        return respuesta_error(f"Error al crear materia: {str(e)}", 400)
+        import traceback
+        traceback.print_exc()
+        error_msg = f"Error al guardar la materia en la base de datos: {str(e)}"
+        print(f"[DIAGNÓSTICO MATERIAS] [EXCEPCIÓN BD]: {error_msg}")
+        if not es_api:
+            flash(error_msg, "danger")
+            return redirect(url_for("admin_dashboard"))
+        return respuesta_error(error_msg, 400)
 
 
 @app.route("/api/materias/<string:id>", methods=["PUT"])

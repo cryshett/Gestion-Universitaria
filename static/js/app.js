@@ -39,7 +39,7 @@ const API = {
         return this.request(`/api/materias${query ? '?' + query : ''}`);
     },
     crearMateria(payload) {
-        return this.request('/api/materias', { method: 'POST', body: JSON.stringify(payload) });
+        return this.request('/materias/crear', { method: 'POST', body: JSON.stringify(payload) });
     },
     editarMateria(id, payload) {
         return this.request(`/api/materias/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -634,10 +634,12 @@ const Controller = {
         document.getElementById('form-materia')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('inp-materia-id').value;
+            const carreraVal = document.getElementById('select-materia-carrera').value;
             const payload = {
                 codigo: document.getElementById('inp-materia-codigo').value.trim().toUpperCase(),
                 nombre: document.getElementById('inp-materia-nombre').value.trim(),
-                carrera_id: document.getElementById('select-materia-carrera').value,
+                carrera_id: carreraVal,
+                carrera: carreraVal,
                 creditos: parseInt(document.getElementById('inp-materia-creditos').value, 10),
                 nivel: parseInt(document.getElementById('select-materia-nivel').value, 10),
                 tipo: document.getElementById('select-materia-tipo').value
