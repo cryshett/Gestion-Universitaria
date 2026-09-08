@@ -325,9 +325,14 @@
                             </select>
                         </div>
 
-                        <button id="btn-nuevo-horario" class="btn btn-primary" style="white-space:nowrap; margin-left:auto;">
-                            <i data-lucide="calendar-plus"></i> Asignar Horario
-                        </button>
+                        <div style="margin-left:auto; display:flex; gap:0.5rem;">
+                            <button id="btn-nuevo-grupo" type="button" class="btn btn-secondary" style="white-space:nowrap;">
+                                <i data-lucide="layers"></i> Nuevo Grupo
+                            </button>
+                            <button id="btn-nuevo-horario" class="btn btn-primary" style="white-space:nowrap;">
+                                <i data-lucide="calendar-plus"></i> Asignar Horario
+                            </button>
+                        </div>
                     </div>
 
                     <div class="table-container">
@@ -1015,39 +1020,48 @@
                 <button type="button" class="btn-close-modal" aria-label="Cerrar">&times;</button>
             </div>
 
-            <form id="form-grupo">
-                <input type="hidden" id="inp-grupo-id" value="">
+            <form id="form-grupo" method="POST" action="{{ url_for('crear_grupo') }}">
+                <input type="hidden" id="inp-grupo-id" name="id" value="">
                 <div class="modal-body" style="display:flex; flex-direction:column; gap:1rem;">
                     <div>
                         <label for="select-grupo-materia" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Materia / Asignatura *</label>
-                        <select id="select-grupo-materia" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                            <!-- Dinámico desde JS -->
+                        <select id="select-grupo-materia" name="materia_id" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <option value="">-- Seleccionar Asignatura --</option>
+                            {% if materias %}
+                                {% for m in materias %}
+                                    <option value="{{ m.id }}">{{ m.codigo }} - {{ m.nombre }} ({{ m.carrera }})</option>
+                                {% endfor %}
+                            {% endif %}
                         </select>
                     </div>
 
                     <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                         <div>
                             <label for="inp-grupo-nombre" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Nombre del Grupo *</label>
-                            <input type="text" id="inp-grupo-nombre" required placeholder="Ej: G1, G2, Secc A" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem; text-transform:uppercase;">
+                            <input type="text" id="inp-grupo-nombre" name="codigo_grupo" required placeholder="Ej: G1, G2, Secc A" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem; text-transform:uppercase;">
                         </div>
                         <div>
                             <label for="inp-grupo-cupo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Cupo Máximo (Aforo) *</label>
-                            <input type="number" id="inp-grupo-cupo" min="5" max="40" value="15" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <input type="number" id="inp-grupo-cupo" name="cupo_maximo" min="5" max="40" value="15" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                         </div>
                     </div>
 
                     <div>
                         <label for="select-grupo-profesor" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Profesor / Docente Titular Responsable</label>
-                        <select id="select-grupo-profesor" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                        <select id="select-grupo-profesor" name="profesor_id" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                             <option value="">-- Sin asignar por ahora --</option>
-                            <!-- Dinámico desde JS -->
+                            {% if profesores %}
+                                {% for p in profesores %}
+                                    <option value="{{ p.id }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            {% endif %}
                         </select>
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary"><i data-lucide="check-circle"></i> Guardar Grupo</button>
+                    <button type="submit" id="btn-guardar-grupo" class="btn btn-primary"><i data-lucide="check-circle"></i> Guardar Grupo</button>
                 </div>
             </form>
         </div>
@@ -1067,7 +1081,8 @@
                 <button type="button" class="btn-close-modal" aria-label="Cerrar">&times;</button>
             </div>
 
-            <form id="form-horario">
+            <form id="form-horario" method="POST" action="{{ url_for('crear_horario') }}">
+                <input type="hidden" id="inp-horario-id" name="id" value="">
                 <div class="modal-body" style="display:flex; flex-direction:column; gap:1rem;">
                     <!-- Alerta dinámica de conflicto -->
                     <div id="alerta-conflicto-horario" style="display:none; padding:0.75rem 1rem; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:0.82rem; line-height:1.4;">
@@ -1079,15 +1094,20 @@
 
                     <div>
                         <label for="select-horario-grupo" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Grupo Académico *</label>
-                        <select id="select-horario-grupo" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
-                            <!-- Dinámico desde JS -->
+                        <select id="select-horario-grupo" name="grupo_id" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <option value="">-- Seleccionar Grupo --</option>
+                            {% if grupos %}
+                                {% for g in grupos %}
+                                    <option value="{{ g.id }}">{{ g.materia.nombre if g.materia else 'Materia' }} - Grupo {{ g.codigo_grupo }}</option>
+                                {% endfor %}
+                            {% endif %}
                         </select>
                     </div>
 
                     <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem;">
                         <div>
                             <label for="select-horario-dia" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Día de Semana *</label>
-                            <select id="select-horario-dia" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <select id="select-horario-dia" name="dia" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                                 <option value="Lunes">Lunes</option>
                                 <option value="Martes">Martes</option>
                                 <option value="Miércoles">Miércoles</option>
@@ -1098,7 +1118,7 @@
                         </div>
                         <div>
                             <label for="select-horario-inicio" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Hora Inicio *</label>
-                            <select id="select-horario-inicio" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <select id="select-horario-inicio" name="hora_inicio" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                                 <option value="07:00">07:00 AM</option>
                                 <option value="09:00">09:00 AM</option>
                                 <option value="10:00">10:00 AM</option>
@@ -1110,7 +1130,7 @@
                         </div>
                         <div>
                             <label for="select-horario-fin" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Hora Fin *</label>
-                            <select id="select-horario-fin" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <select id="select-horario-fin" name="hora_fin" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                                 <option value="09:00">09:00 AM</option>
                                 <option value="11:00">11:00 AM</option>
                                 <option value="12:00">12:00 PM</option>
@@ -1125,7 +1145,7 @@
                     <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                         <div>
                             <label for="inp-horario-aula" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Aula o Salón Asignado *</label>
-                            <select id="inp-horario-aula" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <select id="inp-horario-aula" name="aula" required style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                                 <option value="Aula 101">Aula 101</option>
                                 <option value="Aula 102">Aula 102</option>
                                 <option value="Aula 201">Aula 201</option>
@@ -1138,14 +1158,14 @@
                         </div>
                         <div>
                             <label for="inp-horario-edificio" style="font-size:0.85rem; font-weight:700; display:block; margin-bottom:0.3rem;">Edificio / Pabellón</label>
-                            <input type="text" id="inp-horario-edificio" value="Edificio Central" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
+                            <input type="text" id="inp-horario-edificio" name="edificio" value="Edificio Central" style="width:100%; padding:0.6rem; border:1px solid var(--border-color); border-radius:4px; font-size:0.85rem;">
                         </div>
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary"><i data-lucide="clock"></i> Confirmar Horario</button>
+                    <button type="submit" id="btn-guardar-horario" class="btn btn-primary"><i data-lucide="clock"></i> Confirmar Horario</button>
                 </div>
             </form>
         </div>

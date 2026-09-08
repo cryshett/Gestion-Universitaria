@@ -56,7 +56,7 @@ const API = {
         return this.request(`/api/grupos-academicos${query ? '?' + query : ''}`);
     },
     crearGrupo(payload) {
-        return this.request('/api/grupos', { method: 'POST', body: JSON.stringify(payload) });
+        return this.request('/grupos/crear', { method: 'POST', body: JSON.stringify(payload) });
     },
     editarGrupo(id, payload) {
         return this.request(`/api/grupos/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -69,7 +69,7 @@ const API = {
         return this.request(`/api/horarios${query ? '?' + query : ''}`);
     },
     asignarHorario(payload) {
-        return this.request('/api/horarios', { method: 'POST', body: JSON.stringify(payload) });
+        return this.request('/horarios/crear', { method: 'POST', body: JSON.stringify(payload) });
     },
     eliminarHorario(id) {
         return this.request(`/api/horarios/${id}`, { method: 'DELETE' });
@@ -665,9 +665,13 @@ const Controller = {
         document.getElementById('form-grupo')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('inp-grupo-id').value;
+            const matId = document.getElementById('select-grupo-materia').value;
+            const grpNom = document.getElementById('inp-grupo-nombre').value.trim().toUpperCase();
             const payload = {
-                asignatura_id: document.getElementById('select-grupo-materia').value,
-                nombre: document.getElementById('inp-grupo-nombre').value.trim().toUpperCase(),
+                asignatura_id: matId,
+                materia_id: matId,
+                nombre: grpNom,
+                codigo_grupo: grpNom,
                 cupo_maximo: parseInt(document.getElementById('inp-grupo-cupo').value, 10),
                 profesor_id: document.getElementById('select-grupo-profesor').value || null
             };
@@ -696,9 +700,11 @@ const Controller = {
             const txtConflicto = document.getElementById('txt-conflicto-horario');
             if (alerta) alerta.style.display = 'none';
 
+            const diaVal = document.getElementById('select-horario-dia').value;
             const payload = {
                 grupo_id: document.getElementById('select-horario-grupo').value,
-                dia_semana: document.getElementById('select-horario-dia').value,
+                dia_semana: diaVal,
+                dia: diaVal,
                 hora_inicio: document.getElementById('select-horario-inicio').value,
                 hora_fin: document.getElementById('select-horario-fin').value,
                 aula: document.getElementById('inp-horario-aula').value,

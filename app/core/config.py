@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 1440  # 1 dia
 
-    DATABASE_URL: str = "sqlite:///./mb_system.db"
+    DATABASE_URL: str = "sqlite:///./universidad.db"
 
     MAX_LOGIN_ATTEMPTS: int = 3
     LOCKOUT_MINUTES: int = 5
