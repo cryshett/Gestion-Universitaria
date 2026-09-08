@@ -31,144 +31,15 @@ from app.core.config import settings
 # Creación/Metadatos de tablas mb-system
 Base.metadata.create_all(bind=engine)
 
+from app.db.connection import get_raw_connection, init_database_tables, get_db_inspector_info, DBConnection
+
 def init_universidad_db():
-    """Inicializa y asegura la estructura completa de tablas en universidad.db (SQLite)."""
-    conn = sqlite3.connect("universidad.db")
-    cursor = conn.cursor()
-    cursor.executescript("""
-        CREATE TABLE IF NOT EXISTS carreras (
-            id VARCHAR(10) PRIMARY KEY,
-            nombre VARCHAR(100) NOT NULL,
-            codigo VARCHAR(20) UNIQUE NOT NULL,
-            duracion_semestres INT NOT NULL,
-            total_creditos INT NOT NULL,
-            cupos_maximos INT NOT NULL DEFAULT 30,
-            color VARCHAR(20) NOT NULL,
-            descripcion TEXT NOT NULL,
-            icono VARCHAR(50) NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS profesores (
-            id VARCHAR(20) PRIMARY KEY,
-            documento VARCHAR(20) UNIQUE NOT NULL,
-            nombre VARCHAR(100) NOT NULL,
-            primer_nombre VARCHAR(50) DEFAULT '',
-            segundo_nombre VARCHAR(50) DEFAULT '',
-            primer_apellido VARCHAR(50) DEFAULT '',
-            segundo_apellido VARCHAR(50) DEFAULT '',
-            email VARCHAR(100) UNIQUE NOT NULL,
-            telefono VARCHAR(30) DEFAULT '+52 55 5555-0000',
-            titulo_academico VARCHAR(100) DEFAULT 'Docente Titular',
-            carrera_principal VARCHAR(10) NOT NULL,
-            estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
-            username VARCHAR(50) DEFAULT '',
-            user_id INT DEFAULT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS asignaturas (
-            id VARCHAR(20) PRIMARY KEY,
-            codigo VARCHAR(20) UNIQUE NOT NULL,
-            nombre VARCHAR(150) NOT NULL,
-            creditos INT NOT NULL,
-            nivel INT NOT NULL CHECK (nivel IN (1, 2, 3)),
-            tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('exclusiva', 'compartida')),
-            carrera_id VARCHAR(10) DEFAULT NULL,
-            carreras_compartidas VARCHAR(100) DEFAULT NULL,
-            docente VARCHAR(100) NOT NULL,
-            horario VARCHAR(50) NOT NULL,
-            grupo VARCHAR(10) NOT NULL DEFAULT 'G1',
-            aula VARCHAR(50) NOT NULL DEFAULT 'Aula 101'
-        );
-
-        CREATE TABLE IF NOT EXISTS estudiantes (
-            id VARCHAR(20) PRIMARY KEY,
-            matricula VARCHAR(30) UNIQUE NOT NULL,
-            documento VARCHAR(20) UNIQUE,
-            nombre VARCHAR(100) NOT NULL,
-            primer_nombre VARCHAR(50) DEFAULT '',
-            segundo_nombre VARCHAR(50) DEFAULT '',
-            primer_apellido VARCHAR(50) DEFAULT '',
-            segundo_apellido VARCHAR(50) DEFAULT '',
-            email VARCHAR(100) NOT NULL,
-            telefono VARCHAR(30) DEFAULT '+52 55 5555-5555',
-            carrera_id VARCHAR(10) NOT NULL,
-            semestre INT NOT NULL CHECK (semestre BETWEEN 1 AND 10),
-            grupo VARCHAR(10) NOT NULL DEFAULT 'G1',
-            estado VARCHAR(20) NOT NULL CHECK (estado IN ('Activo', 'En Riesgo', 'Egresado', 'Suspendido')) DEFAULT 'Activo',
-            estado_pago VARCHAR(20) NOT NULL DEFAULT 'Al día' CHECK (estado_pago IN ('Al día', 'Pendiente', 'Bloqueado')),
-            promedio DOUBLE NOT NULL DEFAULT 0.0,
-            foto_avatar VARCHAR(255) NOT NULL,
-            username VARCHAR(50) DEFAULT '',
-            user_id INT DEFAULT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS inscripciones (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            estudiante_id VARCHAR(20) NOT NULL,
-            asignatura_id VARCHAR(20) NOT NULL,
-            nota DOUBLE NOT NULL CHECK (nota BETWEEN 0.0 AND 5.0),
-            periodo VARCHAR(20) NOT NULL DEFAULT '2026-1',
-            UNIQUE (estudiante_id, asignatura_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS notificaciones (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            estudiante_id VARCHAR(20) NOT NULL,
-            titulo VARCHAR(150) NOT NULL,
-            mensaje TEXT NOT NULL,
-            tipo VARCHAR(20) NOT NULL DEFAULT 'pago' CHECK (tipo IN ('pago', 'academico', 'sistema')),
-            fecha VARCHAR(30) NOT NULL,
-            leido TINYINT(1) NOT NULL DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS solicitudes_cambio_grupo (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            estudiante_id VARCHAR(20) NOT NULL,
-            asignatura_id VARCHAR(20) NOT NULL,
-            grupo_actual VARCHAR(10) NOT NULL,
-            grupo_solicitado VARCHAR(10) NOT NULL,
-            motivo TEXT NOT NULL,
-            estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
-            fecha VARCHAR(30) NOT NULL,
-            fecha_resolucion VARCHAR(30) DEFAULT NULL,
-            respuesta_admin TEXT DEFAULT NULL
-        );
-    """)
-
-    # Asegurar columnas necesarias en caso de tablas preexistentes
-    def agregar_columna_si_falta(tabla, columna, definicion):
-        cols = [c[1] for c in cursor.execute(f"PRAGMA table_info({tabla});").fetchall()]
-        if columna not in cols:
-            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion};")
-
-    agregar_columna_si_falta("estudiantes", "documento", "VARCHAR(20) UNIQUE")
-    agregar_columna_si_falta("estudiantes", "grupo", "VARCHAR(10) DEFAULT 'G1'")
-    agregar_columna_si_falta("estudiantes", "username", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("estudiantes", "user_id", "INT DEFAULT NULL")
-    agregar_columna_si_falta("estudiantes", "primer_nombre", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("estudiantes", "segundo_nombre", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("estudiantes", "primer_apellido", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("estudiantes", "segundo_apellido", "VARCHAR(50) DEFAULT ''")
-
-    agregar_columna_si_falta("profesores", "username", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("profesores", "user_id", "INT DEFAULT NULL")
-    agregar_columna_si_falta("profesores", "primer_nombre", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("profesores", "segundo_nombre", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("profesores", "primer_apellido", "VARCHAR(50) DEFAULT ''")
-    agregar_columna_si_falta("profesores", "segundo_apellido", "VARCHAR(50) DEFAULT ''")
-
-    # Poblar carreras institucionales si la tabla está vacía
-    cursor.execute("SELECT COUNT(*) FROM carreras;")
-    if cursor.fetchone()[0] == 0:
-        carreras_base = [
-            ("ISW", "Ingeniería de Software", "ISW", 8, 160, 30, "#3b82f6", "Formación integral en desarrollo y arquitectura de software.", "code"),
-            ("MED", "Medicina Humana", "MED", 10, 220, 30, "#10b981", "Excelencia médica, ciencias biológicas y salud comunitaria.", "stethoscope"),
-            ("DER", "Derecho y Ciencias Políticas", "DER", 8, 150, 30, "#8b5cf6", "Ciencias jurídicas, derecho civil, penal y corporativo.", "scale")
-        ]
-        cursor.executemany("INSERT INTO carreras VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", carreras_base)
-
-    conn.commit()
-    conn.close()
+    """Inicializa y asegura la estructura completa de tablas dual en PostgreSQL/SQLite."""
+    conn = get_raw_connection()
+    try:
+        init_database_tables(conn)
+    finally:
+        conn.close()
 
 init_universidad_db()
 
@@ -207,14 +78,13 @@ ESCALA_MAXIMA_NOTA: float = 5.0
 # =============================================================================
 # GESTIÓN DE CONEXIÓN A BASE DE DATOS MEDIANTE FLASK 'g' CONTEXT
 # =============================================================================
-def get_db() -> sqlite3.Connection:
+def get_db() -> DBConnection:
     """
-    Obtiene la conexión a la base de datos SQLite para la petición HTTP actual.
-    Si la conexión no existe aún en 'g', la crea y almacena.
+    Obtiene la conexión a la base de datos (PostgreSQL en producción o SQLite local)
+    para la petición HTTP actual usando el contexto Flask 'g'.
     """
     if 'db' not in g:
-        g.db = sqlite3.connect("universidad.db")
-        g.db.row_factory = sqlite3.Row
+        g.db = get_raw_connection()
     return g.db
 
 
@@ -679,15 +549,50 @@ def obtener_carreras() -> Tuple[Response, int]:
     return respuesta_exito(carreras)
 
 
+# =============================================================================
+# MÓDULO DE GESTIÓN ACADÉMICA: MATERIAS, PROFESORES, GRUPOS Y HORARIOS
+# =============================================================================
+
+@app.route("/api/sistema/estado", methods=["GET"])
+def obtener_estado_sistema() -> Tuple[Response, int]:
+    """Retorna el estado del motor de base de datos para la interfaz de administración."""
+    motor = "PostgreSQL (Persistente en Render)" if settings.is_postgres else "SQLite (Local)"
+    return respuesta_exito({
+        "status": "ok",
+        "is_postgres": settings.is_postgres,
+        "motor": motor,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+@app.route("/api/profesores", methods=["GET"])
+def obtener_profesores() -> Tuple[Response, int]:
+    """Retorna el listado de docentes activos para asignación de grupos."""
+    carrera_id = request.args.get("carrera_id", type=str)
+    db = get_db()
+    cursor = db.cursor()
+    query = """
+        SELECT p.*, c.nombre as carrera_nombre
+        FROM profesores p
+        LEFT JOIN carreras c ON p.carrera_principal = c.id
+        WHERE 1=1
+    """
+    params = []
+    if carrera_id:
+        query += " AND p.carrera_principal = ?"
+        params.append(carrera_id)
+    query += " ORDER BY p.nombre ASC;"
+    cursor.execute(query, params)
+    profesores = [dict(r) for r in cursor.fetchall()]
+    return respuesta_exito(profesores)
+
+
+@app.route("/api/materias", methods=["GET"])
 @app.route("/api/asignaturas", methods=["GET"])
 def obtener_asignaturas() -> Tuple[Response, int]:
     """
-    Retorna asignaturas filtradas opcionalmente por:
-    - nivel: 1, 2, 3
-    - carrera_id: ISW, MED, ADM, DER, ARQ
-    - docente: nombre exacto de docente
-    - tipo: 'exclusiva' | 'compartida'
-    - q: búsqueda por nombre o código
+    Retorna asignaturas/materias filtradas por carrera, nivel, docente, tipo o búsqueda.
+    Incluye conteo de grupos asociados a cada materia.
     """
     nivel = request.args.get("nivel", type=int)
     carrera_id = request.args.get("carrera_id", type=str)
@@ -696,7 +601,8 @@ def obtener_asignaturas() -> Tuple[Response, int]:
     q = request.args.get("q", type=str)
 
     query = """
-        SELECT a.*, c.nombre as carrera_nombre 
+        SELECT a.*, c.nombre as carrera_nombre,
+               (SELECT COUNT(*) FROM grupos g WHERE g.asignatura_id = a.id) as total_grupos
         FROM asignaturas a 
         LEFT JOIN carreras c ON a.carrera_id = c.id 
         WHERE 1=1
@@ -733,43 +639,218 @@ def obtener_asignaturas() -> Tuple[Response, int]:
     return respuesta_exito(asignaturas)
 
 
+@app.route("/api/materias", methods=["POST"])
+@app.route("/api/asignaturas", methods=["POST"])
+def crear_materia() -> Tuple[Response, int]:
+    """Crea una nueva materia / asignatura académica en la base de datos."""
+    datos = obtener_datos_peticion()
+    codigo = str(datos.get("codigo", "")).strip().upper()
+    nombre = str(datos.get("nombre", "")).strip()
+    carrera_id = str(datos.get("carrera_id", "")).strip().upper()
+    creditos = int(datos.get("creditos") or 3)
+    nivel = int(datos.get("nivel") or 1)
+    tipo = str(datos.get("tipo", "exclusiva")).strip().lower()
+    carreras_compartidas = str(datos.get("carreras_compartidas", "")).strip()
+
+    if not codigo or not nombre or not carrera_id:
+        return respuesta_error("El código, el nombre y la carrera son campos obligatorios.", 400)
+
+    if nivel not in (1, 2, 3):
+        return respuesta_error("El nivel curricular debe ser 1 (Fundamentos), 2 (Intermedio) o 3 (Avanzado).", 400)
+
+    if tipo not in ("exclusiva", "compartida"):
+        tipo = "exclusiva"
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT id FROM asignaturas WHERE UPPER(codigo) = ?;", (codigo,))
+    if cursor.fetchone():
+        return respuesta_error(f"Ya existe una asignatura con el código '{codigo}'.", 400)
+
+    materia_id = f"MAT-{codigo}"
+
+    try:
+        with db:
+            cursor.execute("""
+                INSERT INTO asignaturas (
+                    id, codigo, nombre, creditos, nivel, tipo, carrera_id,
+                    carreras_compartidas, docente, horario, grupo, aula
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Por asignar', 'Por definir', 'G1', 'Aula 101');
+            """, (materia_id, codigo, nombre, creditos, nivel, tipo, carrera_id, carreras_compartidas))
+
+        return respuesta_exito({
+            "mensaje": f"Materia '{nombre}' ({codigo}) creada exitosamente.",
+            "id": materia_id,
+            "codigo": codigo,
+            "nombre": nombre,
+            "creditos": creditos,
+            "carrera_id": carrera_id,
+            "nivel": nivel,
+            "tipo": tipo
+        }, 201)
+    except Exception as e:
+        return respuesta_error(f"Error al crear materia: {str(e)}", 400)
+
+
+@app.route("/api/materias/<string:id>", methods=["PUT"])
+@app.route("/api/asignaturas/<string:id>", methods=["PUT"])
+def editar_materia(id: str) -> Tuple[Response, int]:
+    """Actualiza una materia existente (código, nombre, créditos, carrera, nivel, tipo)."""
+    datos = obtener_datos_peticion()
+    nombre = str(datos.get("nombre", "")).strip()
+    carrera_id = str(datos.get("carrera_id", "")).strip().upper()
+    creditos = int(datos.get("creditos") or 3)
+    nivel = int(datos.get("nivel") or 1)
+    tipo = str(datos.get("tipo", "exclusiva")).strip().lower()
+    carreras_compartidas = str(datos.get("carreras_compartidas", "")).strip()
+
+    if not nombre or not carrera_id:
+        return respuesta_error("El nombre y la carrera son campos obligatorios.", 400)
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM asignaturas WHERE id = ? OR codigo = ?;", (id, id))
+    asg = cursor.fetchone()
+    if not asg:
+        return respuesta_error("Materia no encontrada.", 404)
+
+    real_id = asg["id"]
+    try:
+        with db:
+            cursor.execute("""
+                UPDATE asignaturas
+                SET nombre = ?, carrera_id = ?, creditos = ?, nivel = ?, tipo = ?, carreras_compartidas = ?
+                WHERE id = ?;
+            """, (nombre, carrera_id, creditos, nivel, tipo, carreras_compartidas, real_id))
+
+        return respuesta_exito({"mensaje": f"Materia '{nombre}' actualizada exitosamente.", "id": real_id})
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar materia: {str(e)}", 400)
+
+
+@app.route("/api/materias/<string:id>", methods=["DELETE"])
+@app.route("/api/asignaturas/<string:id>", methods=["DELETE"])
+def eliminar_materia(id: str) -> Tuple[Response, int]:
+    """Elimina una materia si no tiene estudiantes inscritos activos."""
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM asignaturas WHERE id = ? OR codigo = ?;", (id, id))
+    asg = cursor.fetchone()
+    if not asg:
+        return respuesta_error("Materia no encontrada.", 404)
+
+    real_id = asg["id"]
+
+    cursor.execute("SELECT COUNT(*) FROM inscripciones WHERE asignatura_id = ?;", (real_id,))
+    total_inscritos = cursor.fetchone()[0]
+    if total_inscritos > 0:
+        return respuesta_error(f"No se puede eliminar la materia porque tiene {total_inscritos} estudiantes inscritos.", 400)
+
+    try:
+        with db:
+            cursor.execute("""
+                DELETE FROM horarios WHERE grupo_id IN (SELECT id FROM grupos WHERE asignatura_id = ?);
+            """, (real_id,))
+            cursor.execute("DELETE FROM grupos WHERE asignatura_id = ?;", (real_id,))
+            cursor.execute("DELETE FROM asignaturas WHERE id = ?;", (real_id,))
+
+        return respuesta_exito({"mensaje": f"Materia '{asg['nombre']}' eliminada correctamente."})
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar materia: {str(e)}", 400)
+
+
+# =============================================================================
+# GESTIÓN DE GRUPOS ACADÉMICOS
+# =============================================================================
+
+@app.route("/api/grupos-academicos", methods=["GET"])
 @app.route("/api/grupos", methods=["GET"])
-def obtener_grupos_estudio() -> Tuple[Response, int]:
+def obtener_grupos_academicos() -> Tuple[Response, int]:
     """
-    Retorna la lista de grupos académicos de estudio organizados por Carrera, Semestres y Nivel.
-    Garantiza el límite de máximo 15 estudiantes por aula/sección.
+    Retorna la nómina de grupos académicos con su materia, profesor asignado,
+    cupos y bloques de horarios configurados.
     """
     carrera_id = request.args.get("carrera_id", type=str)
+    asignatura_id = request.args.get("asignatura_id", type=str)
     grupo_filtro = request.args.get("grupo", type=str)
 
     db = get_db()
     cursor = db.cursor()
 
     query = """
-        SELECT a.id as asignatura_id, a.codigo, a.nombre as asignatura_nombre, a.nivel, a.tipo,
-               a.carrera_id, a.carreras_compartidas, a.docente, a.horario, a.grupo, a.aula,
-               COUNT(i.estudiante_id) as inscritos
-        FROM asignaturas a
-        LEFT JOIN inscripciones i ON a.id = i.asignatura_id
+        SELECT g.id, g.nombre, g.asignatura_id, g.profesor_id, g.cupo_maximo, g.periodo, g.estado,
+               a.codigo as materia_codigo, a.nombre as materia_nombre, a.nivel, a.tipo,
+               a.carrera_id, c.nombre as carrera_nombre, c.color as carrera_color,
+               p.nombre as profesor_nombre, p.email as profesor_email,
+               (SELECT COUNT(*) FROM inscripciones i WHERE i.asignatura_id = a.id) as inscritos
+        FROM grupos g
+        JOIN asignaturas a ON g.asignatura_id = a.id
+        LEFT JOIN carreras c ON a.carrera_id = c.id
+        LEFT JOIN profesores p ON g.profesor_id = p.id
         WHERE 1=1
     """
-    params: List[Any] = []
+    params = []
 
     if carrera_id:
         query += " AND (a.carrera_id = ? OR a.carreras_compartidas LIKE ?)"
         params.extend([carrera_id, f"%{carrera_id}%"])
 
+    if asignatura_id:
+        query += " AND (g.asignatura_id = ? OR a.codigo = ?)"
+        params.extend([asignatura_id, asignatura_id])
+
     if grupo_filtro:
-        query += " AND a.grupo = ?"
+        query += " AND g.nombre = ?"
         params.append(grupo_filtro)
 
-    query += " GROUP BY a.id ORDER BY a.nivel ASC, a.codigo ASC;"
+    query += " ORDER BY a.nivel ASC, a.codigo ASC, g.nombre ASC;"
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
 
+    # Si la tabla grupos aún no tiene registros pero existen asignaturas, generamos sincronización inicial
+    if len(rows) == 0:
+        cursor.execute("SELECT * FROM asignaturas ORDER BY nivel ASC, codigo ASC;")
+        asgs = cursor.fetchall()
+        if asgs:
+            with db:
+                for asg in asgs:
+                    cursor.execute("SELECT id FROM profesores WHERE nombre = ? LIMIT 1;", (asg["docente"],))
+                    p_row = cursor.fetchone()
+                    p_id = p_row[0] if p_row else None
+                    grp_id = f"GRP-{asg['codigo']}-{asg['grupo'] or 'G1'}"
+                    cursor.execute("""
+                        INSERT INTO grupos (id, nombre, asignatura_id, profesor_id, cupo_maximo, periodo, estado)
+                        VALUES (?, ?, ?, ?, ?, '2026-1', 'Activo');
+                    """, (grp_id, asg["grupo"] or "G1", asg["id"], p_id, 15 if asg["tipo"] == "compartida" else 10))
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
     grupos_resultado = []
     for r in rows:
+        g_id = r["id"]
+        cursor.execute("""
+            SELECT id, dia_semana, hora_inicio, hora_fin, aula, edificio
+            FROM horarios
+            WHERE grupo_id = ?
+            ORDER BY CASE dia_semana
+                WHEN 'Lunes' THEN 1
+                WHEN 'Martes' THEN 2
+                WHEN 'Miércoles' THEN 3
+                WHEN 'Jueves' THEN 4
+                WHEN 'Viernes' THEN 5
+                WHEN 'Sábado' THEN 6
+                ELSE 7 END, hora_inicio ASC;
+        """, (g_id,))
+        horarios_grupo = [dict(h) for h in cursor.fetchall()]
+
+        inscritos = r["inscritos"] or 0
+        capacidad = r["cupo_maximo"] or 15
+
         nivel = r["nivel"]
         if nivel == 1:
             semestres_txt = "1º y 2º Semestre (Fundamentos)"
@@ -778,30 +859,350 @@ def obtener_grupos_estudio() -> Tuple[Response, int]:
         elif nivel == 3:
             semestres_txt = "6º a 8º Semestre (Avanzado)"
         else:
-            semestres_txt = "9º y 10º Semestre (Especialización/Internado)"
-        inscritos = r["inscritos"]
-        capacidad_max = 10 if r["tipo"] == "exclusiva" else 15
-        
+            semestres_txt = "9º y 10º Semestre"
+
+        if horarios_grupo:
+            horario_txt = " | ".join([f"{h['dia_semana'][:3]} {h['hora_inicio']}-{h['hora_fin']}" for h in horarios_grupo])
+            aula_txt = horarios_grupo[0]["aula"]
+        else:
+            horario_txt = "Por definir"
+            aula_txt = "Aula 101"
+
         grupos_resultado.append({
-            "codigo_seccion": f"SEC-{r['codigo']}-{r['grupo']}",
+            "id": g_id,
+            "codigo_seccion": f"SEC-{r['materia_codigo']}-{r['nombre']}",
+            "grupo": r["nombre"],
+            "nombre": r["materia_nombre"],
             "asignatura_id": r["asignatura_id"],
-            "codigo": r["codigo"],
-            "nombre": r["asignatura_nombre"],
+            "codigo": r["materia_codigo"],
+            "materia_nombre": r["materia_nombre"],
             "nivel": nivel,
             "semestres_destino": semestres_txt,
             "tipo": r["tipo"],
             "carrera_id": r["carrera_id"] or "COMPARTIDA",
-            "docente": r["docente"],
-            "horario": r["horario"],
-            "grupo": r["grupo"],
-            "aula": r["aula"],
-            "capacidad_aula": capacidad_max,
+            "carrera_nombre": r["carrera_nombre"] or r["carrera_id"] or "General",
+            "carrera_color": r["carrera_color"] or "#3b82f6",
+            "profesor_id": r["profesor_id"],
+            "profesor_nombre": r["profesor_nombre"] or "Sin asignar",
+            "docente": r["profesor_nombre"] or "Sin asignar",
+            "horario": horario_txt,
+            "horarios": horarios_grupo,
+            "aula": aula_txt,
+            "capacidad_aula": capacidad,
             "inscritos": inscritos,
-            "cupos_libres": max(0, capacidad_max - inscritos),
-            "estado_aula": f"{capacidad_max}/{capacidad_max} Llena" if inscritos >= capacidad_max else f"{inscritos}/{capacidad_max} Ocupados"
+            "cupos_libres": max(0, capacidad - inscritos),
+            "estado_aula": f"{capacidad}/{capacidad} Llena" if inscritos >= capacidad else f"{inscritos}/{capacidad} Ocupados"
         })
 
     return respuesta_exito(grupos_resultado)
+
+
+@app.route("/api/grupos", methods=["POST"])
+def crear_grupo() -> Tuple[Response, int]:
+    """Crea un grupo para una materia y asigna un profesor responsable."""
+    datos = obtener_datos_peticion()
+    asignatura_id = str(datos.get("asignatura_id", "")).strip()
+    nombre = str(datos.get("nombre", "")).strip().upper()
+    profesor_id = datos.get("profesor_id")
+    cupo_maximo = int(datos.get("cupo_maximo") or 15)
+    periodo = str(datos.get("periodo", "2026-1")).strip()
+
+    if not asignatura_id or not nombre:
+        return respuesta_error("La asignatura y el nombre del grupo (ej. G1, G2) son obligatorios.", 400)
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM asignaturas WHERE id = ? OR codigo = ?;", (asignatura_id, asignatura_id))
+    asg = cursor.fetchone()
+    if not asg:
+        return respuesta_error("Asignatura no encontrada.", 404)
+
+    real_asg_id = asg["id"]
+    materia_codigo = asg["codigo"]
+
+    cursor.execute("SELECT id FROM grupos WHERE asignatura_id = ? AND UPPER(nombre) = ?;", (real_asg_id, nombre))
+    if cursor.fetchone():
+        return respuesta_error(f"Ya existe el grupo '{nombre}' para la asignatura '{asg['nombre']}'.", 400)
+
+    grupo_id = f"GRP-{materia_codigo}-{nombre}"
+
+    prof_nombre = None
+    if profesor_id:
+        cursor.execute("SELECT id, nombre FROM profesores WHERE id = ?;", (profesor_id,))
+        p_row = cursor.fetchone()
+        if p_row:
+            prof_nombre = p_row["nombre"]
+
+    try:
+        with db:
+            cursor.execute("""
+                INSERT INTO grupos (id, nombre, asignatura_id, profesor_id, cupo_maximo, periodo, estado)
+                VALUES (?, ?, ?, ?, ?, ?, 'Activo');
+            """, (grupo_id, nombre, real_asg_id, profesor_id, cupo_maximo, periodo))
+
+            if prof_nombre:
+                cursor.execute("UPDATE asignaturas SET docente = ?, grupo = ? WHERE id = ?;", (prof_nombre, nombre, real_asg_id))
+
+        return respuesta_exito({
+            "mensaje": f"Grupo '{nombre}' creado exitosamente para '{asg['nombre']}'.",
+            "id": grupo_id,
+            "nombre": nombre,
+            "asignatura_id": real_asg_id,
+            "profesor_id": profesor_id,
+            "profesor_nombre": prof_nombre
+        }, 201)
+    except Exception as e:
+        return respuesta_error(f"Error al crear grupo: {str(e)}", 400)
+
+
+@app.route("/api/grupos/<string:id>", methods=["PUT"])
+def editar_grupo(id: str) -> Tuple[Response, int]:
+    """Actualiza datos de un grupo (profesor asignado, cupo máximo, estado)."""
+    datos = obtener_datos_peticion()
+    profesor_id = datos.get("profesor_id")
+    cupo_maximo = int(datos.get("cupo_maximo") or 15)
+    estado = str(datos.get("estado", "Activo")).strip()
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM grupos WHERE id = ?;", (id,))
+    grp = cursor.fetchone()
+    if not grp:
+        return respuesta_error("Grupo no encontrado.", 404)
+
+    prof_nombre = None
+    if profesor_id:
+        cursor.execute("SELECT id, nombre FROM profesores WHERE id = ?;", (profesor_id,))
+        p_row = cursor.fetchone()
+        if p_row:
+            prof_nombre = p_row["nombre"]
+
+    try:
+        with db:
+            cursor.execute("""
+                UPDATE grupos
+                SET profesor_id = ?, cupo_maximo = ?, estado = ?
+                WHERE id = ?;
+            """, (profesor_id, cupo_maximo, estado, id))
+
+            if prof_nombre:
+                cursor.execute("UPDATE asignaturas SET docente = ? WHERE id = ?;", (prof_nombre, grp["asignatura_id"]))
+
+        return respuesta_exito({"mensaje": f"Grupo '{grp['nombre']}' actualizado exitosamente."})
+    except Exception as e:
+        return respuesta_error(f"Error al actualizar grupo: {str(e)}", 400)
+
+
+@app.route("/api/grupos/<string:id>", methods=["DELETE"])
+def eliminar_grupo(id: str) -> Tuple[Response, int]:
+    """Elimina un grupo y sus horarios asignados."""
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM grupos WHERE id = ?;", (id,))
+    grp = cursor.fetchone()
+    if not grp:
+        return respuesta_error("Grupo no encontrado.", 404)
+
+    try:
+        with db:
+            cursor.execute("DELETE FROM horarios WHERE grupo_id = ?;", (id,))
+            cursor.execute("DELETE FROM grupos WHERE id = ?;", (id,))
+
+        return respuesta_exito({"mensaje": f"Grupo '{grp['nombre']}' eliminado correctamente."})
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar grupo: {str(e)}", 400)
+
+
+# =============================================================================
+# GESTIÓN DE HORARIOS CON VALIDACIÓN DE CONFLICTOS / CRUCES
+# =============================================================================
+
+@app.route("/api/horarios", methods=["GET"])
+def obtener_horarios() -> Tuple[Response, int]:
+    """
+    Retorna la totalidad de horarios asignados a grupos con detalles de materia,
+    profesor y aula para la matriz semanal de administración.
+    """
+    carrera_id = request.args.get("carrera_id", type=str)
+    dia_semana = request.args.get("dia_semana", type=str)
+
+    db = get_db()
+    cursor = db.cursor()
+
+    query = """
+        SELECT h.id, h.grupo_id, h.dia_semana, h.hora_inicio, h.hora_fin, h.aula, h.edificio,
+               g.nombre as grupo_nombre, g.profesor_id,
+               a.id as asignatura_id, a.codigo as materia_codigo, a.nombre as materia_nombre, a.nivel,
+               c.id as carrera_id, c.nombre as carrera_nombre, c.color as carrera_color,
+               p.nombre as profesor_nombre, p.email as profesor_email
+        FROM horarios h
+        JOIN grupos g ON h.grupo_id = g.id
+        JOIN asignaturas a ON g.asignatura_id = a.id
+        LEFT JOIN carreras c ON a.carrera_id = c.id
+        LEFT JOIN profesores p ON g.profesor_id = p.id
+        WHERE 1=1
+    """
+    params = []
+
+    if carrera_id:
+        query += " AND (a.carrera_id = ? OR a.carreras_compartidas LIKE ?)"
+        params.extend([carrera_id, f"%{carrera_id}%"])
+
+    if dia_semana:
+        query += " AND h.dia_semana = ?"
+        params.append(dia_semana)
+
+    query += """
+        ORDER BY CASE h.dia_semana
+            WHEN 'Lunes' THEN 1
+            WHEN 'Martes' THEN 2
+            WHEN 'Miércoles' THEN 3
+            WHEN 'Jueves' THEN 4
+            WHEN 'Viernes' THEN 5
+            WHEN 'Sábado' THEN 6
+            ELSE 7 END, h.hora_inicio ASC;
+    """
+
+    cursor.execute(query, params)
+    horarios = [dict(r) for r in cursor.fetchall()]
+    return respuesta_exito(horarios)
+
+
+@app.route("/api/horarios", methods=["POST"])
+def asignar_horario() -> Tuple[Response, int]:
+    """
+    Asigna un bloque de horario a un grupo validando que NO existan cruces
+    de horario para el docente asignado ni para el aula física.
+    """
+    datos = obtener_datos_peticion()
+    grupo_id = str(datos.get("grupo_id", "")).strip()
+    dia_semana = str(datos.get("dia_semana", "")).strip()
+    hora_inicio = str(datos.get("hora_inicio", "")).strip()
+    hora_fin = str(datos.get("hora_fin", "")).strip()
+    aula = str(datos.get("aula", "")).strip()
+    edificio = str(datos.get("edificio", "Edificio Central")).strip()
+
+    if not grupo_id or not dia_semana or not hora_inicio or not hora_fin or not aula:
+        return respuesta_error("Todos los campos (grupo, día, hora inicio, hora fin y aula) son requeridos.", 400)
+
+    dias_validos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+    if dia_semana not in dias_validos:
+        return respuesta_error(f"Día inválido. Debe ser uno de: {', '.join(dias_validos)}.", 400)
+
+    if hora_inicio >= hora_fin:
+        return respuesta_error("La hora de inicio debe ser anterior a la hora de finalización.", 400)
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("""
+        SELECT g.*, a.nombre as materia_nombre, a.codigo as materia_codigo, p.id as prof_id, p.nombre as prof_nombre
+        FROM grupos g
+        JOIN asignaturas a ON g.asignatura_id = a.id
+        LEFT JOIN profesores p ON g.profesor_id = p.id
+        WHERE g.id = ?;
+    """, (grupo_id,))
+    grp = cursor.fetchone()
+    if not grp:
+        return respuesta_error("El grupo seleccionado no existe.", 404)
+
+    profesor_id = grp["profesor_id"]
+    profesor_nombre = grp["prof_nombre"] or "Docente sin asignar"
+
+    # VALIDACIÓN 1: CRUCE DE HORARIO DE DOCENTE
+    if profesor_id:
+        cursor.execute("""
+            SELECT h.*, g.nombre as grupo_nombre, a.nombre as materia_nombre, a.codigo as materia_codigo
+            FROM horarios h
+            JOIN grupos g ON h.grupo_id = g.id
+            JOIN asignaturas a ON g.asignatura_id = a.id
+            WHERE g.profesor_id = ? AND h.dia_semana = ?;
+        """, (profesor_id, dia_semana))
+        horarios_docente = cursor.fetchall()
+
+        for h in horarios_docente:
+            h_ini = h["hora_inicio"]
+            h_fin = h["hora_fin"]
+            if h_ini < hora_fin and h_fin > hora_inicio:
+                return respuesta_error(
+                    f"¡Conflicto de Docente! El profesor {profesor_nombre} ya tiene clase programada "
+                    f"el {dia_semana} de {h_ini} a {h_fin} en la materia '{h['materia_nombre']}' "
+                    f"(Grupo {h['grupo_nombre']}, Aula: {h['aula']}).", 400
+                )
+
+    # VALIDACIÓN 2: CRUCE DE HORARIO DE AULA / SALÓN
+    cursor.execute("""
+        SELECT h.*, g.nombre as grupo_nombre, a.nombre as materia_nombre, a.codigo as materia_codigo,
+               p.nombre as docente_en_aula
+        FROM horarios h
+        JOIN grupos g ON h.grupo_id = g.id
+        JOIN asignaturas a ON g.asignatura_id = a.id
+        LEFT JOIN profesores p ON g.profesor_id = p.id
+        WHERE LOWER(h.aula) = LOWER(?) AND h.dia_semana = ?;
+    """, (aula, dia_semana))
+    horarios_aula = cursor.fetchall()
+
+    for h in horarios_aula:
+        h_ini = h["hora_inicio"]
+        h_fin = h["hora_fin"]
+        if h_ini < hora_fin and h_fin > hora_inicio:
+            doc_info = f" (Prof. {h['docente_en_aula']})" if h["docente_en_aula"] else ""
+            return respuesta_error(
+                f"¡Conflicto de Aula! El aula '{aula}' ya se encuentra ocupada "
+                f"el {dia_semana} de {h_ini} a {h_fin} por la asignatura '{h['materia_nombre']}' "
+                f"(Grupo {h['grupo_nombre']}{doc_info}).", 400
+            )
+
+    # INSERCIÓN DEL NUEVO HORARIO
+    try:
+        with db:
+            cursor.execute("""
+                INSERT INTO horarios (grupo_id, dia_semana, hora_inicio, hora_fin, aula, edificio)
+                VALUES (?, ?, ?, ?, ?, ?);
+            """, (grupo_id, dia_semana, hora_inicio, hora_fin, aula, edificio))
+
+            dia_abr = dia_semana[:3]
+            bloque_str = f"{dia_abr} {hora_inicio}-{hora_fin}"
+            cursor.execute("""
+                UPDATE asignaturas
+                SET horario = ?, aula = ?, grupo = ?
+                WHERE id = ?;
+            """, (bloque_str, aula, grp["nombre"], grp["asignatura_id"]))
+
+        new_id = getattr(cursor, "lastrowid", None)
+        return respuesta_exito({
+            "mensaje": f"Horario asignado exitosamente: {dia_semana} {hora_inicio} - {hora_fin} en {aula}.",
+            "id": new_id,
+            "grupo_id": grupo_id,
+            "dia_semana": dia_semana,
+            "hora_inicio": hora_inicio,
+            "hora_fin": hora_fin,
+            "aula": aula
+        }, 201)
+    except Exception as e:
+        return respuesta_error(f"Error al registrar horario: {str(e)}", 400)
+
+
+@app.route("/api/horarios/<int:id>", methods=["DELETE"])
+def eliminar_horario(id: int) -> Tuple[Response, int]:
+    """Elimina un bloque horario previamente asignado."""
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM horarios WHERE id = ?;", (id,))
+    h = cursor.fetchone()
+    if not h:
+        return respuesta_error("Horario no encontrado.", 404)
+
+    try:
+        with db:
+            cursor.execute("DELETE FROM horarios WHERE id = ?;", (id,))
+        return respuesta_exito({"mensaje": "Horario eliminado correctamente."})
+    except Exception as e:
+        return respuesta_error(f"Error al eliminar horario: {str(e)}", 400)
 
 
 @app.route("/api/estudiantes", methods=["GET"])
@@ -1420,33 +1821,9 @@ ETIQUETAS_CAMPOS = {
 
 @app.route("/api/database/tablas", methods=["GET"])
 def inspeccionar_base_datos() -> Tuple[Response, int]:
-    """Retorna el esquema y la totalidad de registros de universidad.db para el visor interactivo rectoral."""
+    """Retorna el esquema y la totalidad de registros para el visor interactivo rectoral (SQLite / PostgreSQL)."""
     db = get_db()
-    cursor = db.cursor()
-    
-    nombres_tablas = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence';").fetchall()]
-    
-    resultado = {}
-    for tabla in nombres_tablas:
-        columnas_info = cursor.execute(f"PRAGMA table_info({tabla});").fetchall()
-        columnas = [col[1] for col in columnas_info]
-        registros = [dict(r) for r in cursor.execute(f"SELECT * FROM {tabla};").fetchall()]
-        
-        resultado[tabla] = {
-            "totalRegistros": len(registros),
-            "columnas": columnas,
-            "columnasDetalle": [
-                {
-                    "nombre": col[1],
-                    "etiqueta": ETIQUETAS_CAMPOS.get(col[1], col[1]),
-                    "tipo": col[2],
-                    "notnull": col[3],
-                    "pk": col[5]
-                } for col in columnas_info
-            ],
-            "muestra": registros
-        }
-        
+    resultado = get_db_inspector_info(db, ETIQUETAS_CAMPOS)
     return respuesta_exito(resultado)
 
 
@@ -1457,7 +1834,7 @@ def insertar_registro_bd() -> Tuple[Response, int]:
     tabla = datos_json.get("tabla")
     registro = datos_json.get("registro") or {}
 
-    tablas_permitidas = ["carreras", "asignaturas", "estudiantes", "inscripciones", "profesores"]
+    tablas_permitidas = ["carreras", "asignaturas", "grupos", "horarios", "estudiantes", "inscripciones", "profesores"]
     if tabla not in tablas_permitidas:
         return respuesta_error("Tabla no permitida o inválida", 400)
 

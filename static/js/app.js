@@ -33,11 +33,52 @@ const API = {
         }
     },
 
+    getEstadoSistema() { return this.request('/api/sistema/estado'); },
+    getMaterias(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return this.request(`/api/materias${query ? '?' + query : ''}`);
+    },
+    crearMateria(payload) {
+        return this.request('/api/materias', { method: 'POST', body: JSON.stringify(payload) });
+    },
+    editarMateria(id, payload) {
+        return this.request(`/api/materias/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+    },
+    eliminarMateria(id) {
+        return this.request(`/api/materias/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+    getProfesores(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return this.request(`/api/profesores${query ? '?' + query : ''}`);
+    },
+    getGruposAcademicos(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return this.request(`/api/grupos-academicos${query ? '?' + query : ''}`);
+    },
+    crearGrupo(payload) {
+        return this.request('/api/grupos', { method: 'POST', body: JSON.stringify(payload) });
+    },
+    editarGrupo(id, payload) {
+        return this.request(`/api/grupos/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+    },
+    eliminarGrupo(id) {
+        return this.request(`/api/grupos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+    getHorarios(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return this.request(`/api/horarios${query ? '?' + query : ''}`);
+    },
+    asignarHorario(payload) {
+        return this.request('/api/horarios', { method: 'POST', body: JSON.stringify(payload) });
+    },
+    eliminarHorario(id) {
+        return this.request(`/api/horarios/${id}`, { method: 'DELETE' });
+    },
     getDashboard() { return this.request('/api/dashboard'); },
     getCarreras() { return this.request('/api/carreras'); },
     getGrupos(params = {}) {
         const query = new URLSearchParams(params).toString();
-        return this.request(`/api/grupos${query ? '?' + query : ''}`);
+        return this.request(`/api/grupos-academicos${query ? '?' + query : ''}`);
     },
     getAsignaturas(params = {}) {
         const query = new URLSearchParams(params).toString();
@@ -281,6 +322,7 @@ const Controller = {
         UI.refrescarIconos();
 
         this.bindEvents();
+        await this.cargarEstadoMotorBD();
         await this.cargarDashboard();
         await this.cargarEstudiantes();
         await this.cargarAsignaturas();
@@ -545,14 +587,136 @@ const Controller = {
             document.getElementById('modal-estudiante').classList.add('active');
         });
 
+        // Botón Nueva Materia
+        document.getElementById('btn-nueva-materia')?.addEventListener('click', () => {
+            const form = document.getElementById('form-materia');
+            if (form) form.reset();
+            document.getElementById('inp-materia-id').value = '';
+            document.getElementById('modal-materia-titulo').innerText = 'Nueva Asignatura / Materia';
+            document.getElementById('modal-materia')?.classList.add('active');
+            UI.refrescarIconos();
+        });
+
+        // Botón Nuevo Grupo
+        document.getElementById('btn-nuevo-grupo')?.addEventListener('click', () => {
+            this.abrirModalNuevoGrupoConMateria();
+        });
+
+        // Botón Nuevo Horario
+        document.getElementById('btn-nuevo-horario')?.addEventListener('click', () => {
+            this.abrirModalNuevoHorarioConGrupo();
+        });
+
+        // Cierre universal de modales
         document.querySelectorAll('.btn-close-modal').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.getElementById('modal-estudiante').classList.remove('active');
-                document.getElementById('modal-kardex').classList.remove('active');
-                document.getElementById('modal-insertar-db').classList.remove('active');
+                document.getElementById('modal-estudiante')?.classList.remove('active');
+                document.getElementById('modal-kardex')?.classList.remove('active');
+                document.getElementById('modal-insertar-db')?.classList.remove('active');
                 document.getElementById('modal-nomina-grupo')?.classList.remove('active');
                 document.getElementById('modal-pago-notificacion')?.classList.remove('active');
+                document.getElementById('modal-materia')?.classList.remove('active');
+                document.getElementById('modal-grupo')?.classList.remove('active');
+                document.getElementById('modal-horario')?.classList.remove('active');
             });
+        });
+
+        // Cerrar modales al hacer clic fuera del contenido
+        document.querySelectorAll('.modal-backdrop').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Formulario Materia (Crear / Editar)
+        document.getElementById('form-materia')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('inp-materia-id').value;
+            const payload = {
+                codigo: document.getElementById('inp-materia-codigo').value.trim().toUpperCase(),
+                nombre: document.getElementById('inp-materia-nombre').value.trim(),
+                carrera_id: document.getElementById('select-materia-carrera').value,
+                creditos: parseInt(document.getElementById('inp-materia-creditos').value, 10),
+                nivel: parseInt(document.getElementById('select-materia-nivel').value, 10),
+                tipo: document.getElementById('select-materia-tipo').value
+            };
+
+            try {
+                let res;
+                if (id) {
+                    res = await API.editarMateria(id, payload);
+                } else {
+                    res = await API.crearMateria(payload);
+                }
+                UI.mostrarToast(res.mensaje, 'success');
+                document.getElementById('modal-materia').classList.remove('active');
+                await this.cargarAsignaturas();
+                await this.cargarDashboard();
+            } catch (err) {
+                console.error("Error al guardar materia:", err);
+            }
+        });
+
+        // Formulario Grupo (Crear / Editar)
+        document.getElementById('form-grupo')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('inp-grupo-id').value;
+            const payload = {
+                asignatura_id: document.getElementById('select-grupo-materia').value,
+                nombre: document.getElementById('inp-grupo-nombre').value.trim().toUpperCase(),
+                cupo_maximo: parseInt(document.getElementById('inp-grupo-cupo').value, 10),
+                profesor_id: document.getElementById('select-grupo-profesor').value || null
+            };
+
+            try {
+                let res;
+                if (id) {
+                    res = await API.editarGrupo(id, payload);
+                } else {
+                    res = await API.crearGrupo(payload);
+                }
+                UI.mostrarToast(res.mensaje, 'success');
+                document.getElementById('modal-grupo').classList.remove('active');
+                await this.cargarGrupos();
+                await this.cargarHorarios();
+                await this.cargarAsignaturas();
+            } catch (err) {
+                console.error("Error al guardar grupo:", err);
+            }
+        });
+
+        // Formulario Horario (Asignación con detección estricta de conflictos)
+        document.getElementById('form-horario')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alerta = document.getElementById('alerta-conflicto-horario');
+            const txtConflicto = document.getElementById('txt-conflicto-horario');
+            if (alerta) alerta.style.display = 'none';
+
+            const payload = {
+                grupo_id: document.getElementById('select-horario-grupo').value,
+                dia_semana: document.getElementById('select-horario-dia').value,
+                hora_inicio: document.getElementById('select-horario-inicio').value,
+                hora_fin: document.getElementById('select-horario-fin').value,
+                aula: document.getElementById('inp-horario-aula').value,
+                edificio: document.getElementById('inp-horario-edificio').value.trim()
+            };
+
+            try {
+                const res = await API.asignarHorario(payload);
+                UI.mostrarToast(res.mensaje, 'success');
+                document.getElementById('modal-horario').classList.remove('active');
+                await this.cargarHorarios();
+                await this.cargarGrupos();
+                await this.cargarAsignaturas();
+            } catch (err) {
+                if (alerta && txtConflicto) {
+                    alerta.style.display = 'block';
+                    txtConflicto.innerText = err.message || 'Error al asignar horario.';
+                }
+                console.warn("Conflicto al asignar horario:", err);
+            }
         });
 
         document.getElementById('form-estudiante')?.addEventListener('submit', async (e) => {
@@ -855,6 +1019,35 @@ const Controller = {
         });
     },
 
+    async cargarEstadoMotorBD() {
+        try {
+            const estado = await API.getEstadoSistema();
+            const badge = document.getElementById('badge-engine-status');
+            const txt = document.getElementById('txt-engine-status');
+            if (txt) {
+                if (estado.is_postgres) {
+                    txt.innerText = 'BD: PostgreSQL (Render)';
+                    if (badge) {
+                        badge.style.background = '#064e3b';
+                        badge.style.color = '#34d399';
+                        badge.style.border = '1px solid #059669';
+                        badge.title = 'Base de datos PostgreSQL conectada (Persistente en Render)';
+                    }
+                } else {
+                    txt.innerText = 'BD: SQLite (Local)';
+                    if (badge) {
+                        badge.style.background = '#0f172a';
+                        badge.style.color = '#38bdf8';
+                        badge.style.border = '1px solid #334155';
+                        badge.title = 'Base de datos SQLite local (desarrollo local)';
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error al cargar estado del motor de base de datos:", err);
+        }
+    },
+
     async cargarAsignaturas() {
         const params = {
             q: document.getElementById('busqueda-asg-input')?.value || '',
@@ -884,14 +1077,27 @@ const Controller = {
                     <span class="badge ${asg.tipo === 'exclusiva' ? 'badge-activo' : 'badge-egresado'}">
                         ${asg.tipo === 'exclusiva' ? `Exclusiva (${asg.carrera_id})` : 'Compartida / General'}
                     </span>
-                    <span class="badge badge-activo" style="margin-left:0.3rem;">${asg.grupo} • ${asg.aula}</span>
+                    <span class="badge badge-activo" style="margin-left:0.3rem;">${asg.grupo || 'G1'} • ${asg.aula || 'Por asignar'}</span>
                 </div>
                 <div style="font-size:0.8rem; color:var(--primary); font-weight:600; margin-top:0.25rem;">
-                    <i data-lucide="clock" style="width:14px; height:14px; vertical-align:middle;"></i> ${asg.horario}
+                    <i data-lucide="clock" style="width:14px; height:14px; vertical-align:middle;"></i> ${asg.horario || 'Horario flexible'}
                 </div>
                 <div class="asg-footer" style="margin-top:0.5rem; border-top:1px solid #f1f5f9; padding-top:0.5rem;">
-                    <span><i data-lucide="user"></i> <strong>${asg.docente}</strong></span>
+                    <span><i data-lucide="user"></i> <strong>${asg.docente || 'Sin asignar'}</strong></span>
                     <span><strong>${asg.creditos} Créditos</strong></span>
+                </div>
+                <div class="asg-actions" style="margin-top:0.6rem; border-top:1px dashed #e2e8f0; padding-top:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+                    <button class="btn btn-secondary" onclick="Controller.abrirModalNuevoGrupoConMateria('${asg.id}')" style="font-size:0.75rem; padding:0.25rem 0.5rem;" title="Crear grupo para esta materia">
+                        <i data-lucide="layers" style="width:12px; height:12px;"></i> + Grupo
+                    </button>
+                    <div style="display:flex; gap:0.3rem;">
+                        <button class="btn btn-secondary" onclick="Controller.abrirModalEditarMateria('${asg.id}', '${asg.codigo}', '${asg.nombre.replace(/'/g, "\\'")}', '${asg.carrera_id}', ${asg.creditos}, ${asg.nivel}, '${asg.tipo}')" style="font-size:0.75rem; padding:0.25rem 0.5rem;" title="Editar Asignatura">
+                            <i data-lucide="edit-3" style="width:12px; height:12px;"></i> Editar
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="Controller.eliminarMateria('${asg.id}', '${asg.nombre.replace(/'/g, "\\'")}')" style="font-size:0.75rem; padding:0.25rem 0.5rem;" title="Eliminar Asignatura">
+                            <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         `).join('');
@@ -899,7 +1105,34 @@ const Controller = {
         UI.refrescarIconos();
     },
 
-    // MATRIZ SEMANAL DE HORARIOS (7:00 AM - 12:00 PM) EN BLOQUES DE 2 HORAS
+    abrirModalEditarMateria(id, codigo, nombre, carrera, creditos, nivel, tipo) {
+        document.getElementById('inp-materia-id').value = id;
+        document.getElementById('inp-materia-codigo').value = codigo;
+        document.getElementById('inp-materia-nombre').value = nombre;
+        document.getElementById('select-materia-carrera').value = carrera;
+        document.getElementById('inp-materia-creditos').value = creditos;
+        document.getElementById('select-materia-nivel').value = nivel;
+        document.getElementById('select-materia-tipo').value = tipo;
+        document.getElementById('modal-materia-titulo').innerText = `Editar Asignatura: ${codigo}`;
+        document.getElementById('modal-materia').classList.add('active');
+        UI.refrescarIconos();
+    },
+
+    async eliminarMateria(id, nombre) {
+        if (!confirm(`¿Confirma eliminar la materia '${nombre}'?\n\n¡Atención! También se eliminarán sus grupos y horarios asociados.`)) return;
+        try {
+            const res = await API.eliminarMateria(id);
+            UI.mostrarToast(res.mensaje, 'success');
+            await this.cargarAsignaturas();
+            await this.cargarGrupos();
+            await this.cargarHorarios();
+            await this.cargarDashboard();
+        } catch (err) {
+            console.error("Error al eliminar materia:", err);
+        }
+    },
+
+    // MATRIZ SEMANAL DE HORARIOS EN BLOQUES
     async cargarHorarios() {
         const carreraId = document.getElementById('filtro-horario-carrera')?.value || '';
         const grupo = document.getElementById('filtro-horario-grupo')?.value || '';
@@ -907,40 +1140,56 @@ const Controller = {
         const params = {};
         if (carreraId) params.carrera_id = carreraId;
 
-        const asignaturas = await API.getAsignaturas(params);
+        const horarios = await API.getHorarios(params);
         const tbody = document.getElementById('tbody-matriz-horarios');
         if (!tbody) return;
 
         // Filtrar por grupo si fue seleccionado
-        const filtradas = grupo ? asignaturas.filter(a => a.grupo === grupo) : asignaturas;
+        const filtradas = grupo ? horarios.filter(h => h.grupo_nombre === grupo || (h.grupo_id && h.grupo_id.endsWith(grupo))) : horarios;
 
         const bloques = [
-            { id: "07:00-09:00", label: "07:00 - 09:00", sub: "Bloque 1" },
-            { id: "09:00-11:00", label: "09:00 - 11:00", sub: "Bloque 2" },
-            { id: "10:00-12:00", label: "10:00 - 12:00", sub: "Bloque 3 / Prácticas" }
+            { id: "07:00-09:00", ini: "07:00", fin: "09:00", label: "07:00 - 09:00", sub: "Bloque 1 (Mañana)" },
+            { id: "09:00-11:00", ini: "09:00", fin: "11:00", label: "09:00 - 11:00", sub: "Bloque 2 (Mañana)" },
+            { id: "10:00-12:00", ini: "10:00", fin: "12:00", label: "10:00 - 12:00", sub: "Bloque 3 / Prácticas" },
+            { id: "12:00-14:00", ini: "12:00", fin: "14:00", label: "12:00 - 14:00", sub: "Bloque Mediodía" },
+            { id: "14:00-16:00", ini: "14:00", fin: "16:00", label: "14:00 - 16:00", sub: "Bloque 4 (Tarde)" },
+            { id: "16:00-18:00", ini: "16:00", fin: "18:00", label: "16:00 - 18:00", sub: "Bloque 5 (Tarde)" },
+            { id: "18:00-20:00", ini: "18:00", fin: "20:00", label: "18:00 - 20:00", sub: "Bloque 6 (Noche)" }
         ];
 
-        const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie"];
+        const diasSemana = [
+            { nombre: "Lunes", prefijo: "Lun" },
+            { nombre: "Martes", prefijo: "Mar" },
+            { nombre: "Miércoles", prefijo: "Mié" },
+            { nombre: "Jueves", prefijo: "Jue" },
+            { nombre: "Viernes", prefijo: "Vie" }
+        ];
 
         tbody.innerHTML = bloques.map(b => {
-            const celdasDias = diasSemana.map(dia => {
-                const asgsEnBloque = filtradas.filter(a => {
-                    return a.horario.includes(dia) && a.horario.includes(b.id);
+            const celdasDias = diasSemana.map(d => {
+                const enBloque = filtradas.filter(h => {
+                    const diaMatch = h.dia_semana && h.dia_semana.toLowerCase().startsWith(d.prefijo.toLowerCase().slice(0, 3));
+                    const timeOverlap = (h.hora_inicio < b.fin && h.hora_fin > b.ini);
+                    return diaMatch && timeOverlap;
                 });
 
-                if (asgsEnBloque.length === 0) {
+                if (enBloque.length === 0) {
                     return `<td style="color:#94a3b8; font-size:0.78rem; text-align:center; vertical-align:middle; background:#fafafa;">Libre</td>`;
                 }
 
-                const cardsHTML = asgsEnBloque.map(a => `
-                    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:4px; padding:0.5rem; margin-bottom:0.4rem; font-size:0.78rem;">
-                        <div style="font-weight:700; color:#0369a1;"><code>${a.codigo}</code> ${a.nombre}</div>
-                        <div style="color:#0f172a; margin:0.15rem 0; display:inline-flex; align-items:center; gap:3px;">
-                            <i data-lucide="user-check" style="width:12px; height:12px;"></i> <span>${a.docente}</span>
+                const cardsHTML = enBloque.map(h => `
+                    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:4px; padding:0.45rem; margin-bottom:0.35rem; font-size:0.78rem; position:relative; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                        <button onclick="Controller.eliminarHorario(${h.id})" title="Eliminar Horario" style="position:absolute; top:4px; right:4px; border:none; background:#fee2e2; color:#b91c1c; border-radius:3px; cursor:pointer; font-size:0.7rem; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; line-height:1; padding:0;">✕</button>
+                        <div style="font-weight:700; color:#0369a1; padding-right:18px;"><code>${h.materia_codigo || ''}</code> ${h.materia_nombre || ''}</div>
+                        <div style="color:#0f172a; margin:0.15rem 0; font-size:0.74rem;">
+                            <span style="color:#475569;"><i data-lucide="clock" style="width:11px; height:11px; vertical-align:middle;"></i> ${h.hora_inicio} - ${h.hora_fin}</span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#475569;">
-                            <span>${a.grupo} • ${a.aula}</span>
-                            <strong>Nivel ${a.nivel}</strong>
+                        <div style="color:#0f172a; margin:0.15rem 0; font-size:0.74rem; display:inline-flex; align-items:center; gap:3px;">
+                            <i data-lucide="user-check" style="width:12px; height:12px;"></i> <span>${h.profesor_nombre || 'Docente sin asignar'}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#475569; border-top:1px dashed #e0f2fe; padding-top:2px; margin-top:3px;">
+                            <span>Grupo ${h.grupo_nombre} • <strong>${h.aula}</strong></span>
+                            ${h.nivel ? `<span>Nivel ${h.nivel}</span>` : ''}
                         </div>
                     </div>
                 `).join('');
@@ -960,6 +1209,43 @@ const Controller = {
         }).join('');
 
         UI.refrescarIconos();
+    },
+
+    async abrirModalNuevoHorarioConGrupo(grupoId = '') {
+        const modal = document.getElementById('modal-horario');
+        const form = document.getElementById('form-horario');
+        const alerta = document.getElementById('alerta-conflicto-horario');
+        if (form) form.reset();
+        if (alerta) alerta.style.display = 'none';
+
+        const selectGrupo = document.getElementById('select-horario-grupo');
+        if (selectGrupo) {
+            try {
+                const grupos = await API.getGruposAcademicos();
+                selectGrupo.innerHTML = grupos.map(g => `
+                    <option value="${g.id}" ${g.id === grupoId ? 'selected' : ''}>
+                        ${g.codigo_seccion} - ${g.nombre} (Grupo ${g.grupo} • ${g.docente})
+                    </option>
+                `).join('');
+            } catch (e) {
+                console.error("Error al cargar grupos en modal horario:", e);
+            }
+        }
+
+        if (modal) modal.classList.add('active');
+        UI.refrescarIconos();
+    },
+
+    async eliminarHorario(id) {
+        if (!confirm(`¿Confirma eliminar este bloque de horario asignado?`)) return;
+        try {
+            const res = await API.eliminarHorario(id);
+            UI.mostrarToast(res.mensaje, 'success');
+            await this.cargarHorarios();
+            await this.cargarGrupos();
+        } catch (err) {
+            console.error("Error al eliminar horario:", err);
+        }
     },
 
     // GESTIÓN DE GRUPOS DE ESTUDIO Y AULAS (MÁX 10 EXCLUSIVA | 15 COMPARTIDA)
@@ -1022,9 +1308,17 @@ const Controller = {
                                         </div>
                                     </td>
                                     <td>
-                                        <button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.78rem;" onclick="Controller.verAlumnosGrupo('${g.asignatura_id}', '${g.grupo}', '${g.nombre.replace(/'/g, "\\'")}')">
-                                            <i data-lucide="users" style="width:13px; height:13px;"></i> Alumnos (${g.inscritos})
-                                        </button>
+                                        <div style="display:flex; gap:0.3rem;">
+                                            <button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.78rem;" onclick="Controller.verAlumnosGrupo('${g.asignatura_id}', '${g.grupo}', '${g.nombre.replace(/'/g, "\\'")}')" title="Ver Nómina">
+                                                <i data-lucide="users" style="width:13px; height:13px;"></i> Nómina (${g.inscritos})
+                                            </button>
+                                            <button class="btn btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.78rem;" onclick="Controller.abrirModalNuevoHorarioConGrupo('${g.id}')" title="Asignar Horario">
+                                                <i data-lucide="calendar-plus" style="width:13px; height:13px;"></i> + Horario
+                                            </button>
+                                            <button class="btn btn-outline-danger" style="padding:0.25rem 0.45rem; font-size:0.78rem;" onclick="Controller.eliminarGrupo('${g.id}', '${g.nombre.replace(/'/g, "\\'")}')" title="Eliminar Grupo">
+                                                <i data-lucide="trash-2" style="width:13px; height:13px;"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             `;
@@ -1061,11 +1355,23 @@ const Controller = {
                             </div>
                         </div>
 
-                        <div style="font-size:0.78rem; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:0.4rem;">
+                        <div style="font-size:0.78rem; color:var(--text-muted); margin:0.3rem 0;">
+                            <i data-lucide="clock" style="width:12px; height:12px; vertical-align:middle;"></i> ${g.horario || 'Sin horario'}
+                        </div>
+
+                        <div style="font-size:0.78rem; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:0.4rem; gap:0.3rem; flex-wrap:wrap;">
                             <span>Docente: <strong>${g.docente}</strong></span>
-                            <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="Controller.verAlumnosGrupo('${g.asignatura_id}', '${g.grupo}', '${g.nombre.replace(/'/g, "\\'")}')">
-                                <i data-lucide="users" style="width:12px; height:12px;"></i> Nómina (${g.inscritos})
-                            </button>
+                            <div style="display:flex; gap:0.3rem;">
+                                <button class="btn btn-secondary" style="padding:0.25rem 0.45rem; font-size:0.75rem;" onclick="Controller.verAlumnosGrupo('${g.asignatura_id}', '${g.grupo}', '${g.nombre.replace(/'/g, "\\'")}')" title="Ver Nómina">
+                                    <i data-lucide="users" style="width:12px; height:12px;"></i> (${g.inscritos})
+                                </button>
+                                <button class="btn btn-secondary" style="padding:0.25rem 0.45rem; font-size:0.75rem;" onclick="Controller.abrirModalNuevoHorarioConGrupo('${g.id}')" title="Asignar Horario">
+                                    <i data-lucide="calendar-plus" style="width:12px; height:12px;"></i> + Horario
+                                </button>
+                                <button class="btn btn-outline-danger" style="padding:0.25rem 0.45rem; font-size:0.75rem;" onclick="Controller.eliminarGrupo('${g.id}', '${g.nombre.replace(/'/g, "\\'")}')" title="Eliminar Grupo">
+                                    <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1073,6 +1379,57 @@ const Controller = {
         }
 
         UI.refrescarIconos();
+    },
+
+    async abrirModalNuevoGrupoConMateria(materiaId = '') {
+        const modal = document.getElementById('modal-grupo');
+        const form = document.getElementById('form-grupo');
+        if (form) form.reset();
+        document.getElementById('inp-grupo-id').value = '';
+        document.getElementById('modal-grupo-titulo').innerText = 'Nuevo Grupo Académico';
+
+        const selectMat = document.getElementById('select-grupo-materia');
+        if (selectMat) {
+            try {
+                const materias = await API.getMaterias();
+                selectMat.innerHTML = materias.map(m => `
+                    <option value="${m.id}" ${m.id === materiaId ? 'selected' : ''}>
+                        ${m.codigo} - ${m.nombre} (${m.carrera_id})
+                    </option>
+                `).join('');
+            } catch (e) {
+                console.error("Error al cargar materias en modal grupo:", e);
+            }
+        }
+
+        const selectProf = document.getElementById('select-grupo-profesor');
+        if (selectProf) {
+            try {
+                const profesores = await API.getProfesores();
+                selectProf.innerHTML = '<option value="">-- Sin asignar por ahora --</option>' + 
+                    profesores.map(p => `
+                        <option value="${p.id}">${p.nombre} (${p.carrera_principal || 'Docente'})</option>
+                    `).join('');
+            } catch (e) {
+                console.error("Error al cargar profesores en modal grupo:", e);
+            }
+        }
+
+        if (modal) modal.classList.add('active');
+        UI.refrescarIconos();
+    },
+
+    async eliminarGrupo(id, nombre) {
+        if (!confirm(`¿Confirma eliminar el grupo '${nombre}'?\n\nTambién se eliminarán sus horarios asignados.`)) return;
+        try {
+            const res = await API.eliminarGrupo(id);
+            UI.mostrarToast(res.mensaje, 'success');
+            await this.cargarGrupos();
+            await this.cargarHorarios();
+            await this.cargarAsignaturas();
+        } catch (err) {
+            console.error("Error al eliminar grupo:", err);
+        }
     },
 
     // VISOR ACORDEÓN BASE DE DATOS

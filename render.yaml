@@ -1,0 +1,22 @@
+databases:
+  - name: universidad-db
+    databaseName: universidad
+    user: universidad_user
+    plan: free
+
+services:
+  - type: web
+    name: gestion-universitaria
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: DATABASE_URL
+        fromDatabase:
+          name: universidad-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
